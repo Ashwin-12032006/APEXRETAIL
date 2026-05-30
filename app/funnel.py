@@ -7,6 +7,15 @@ from typing import Dict, List, Any
 
 router = APIRouter()
 
+
+def _naive_dt(dt):
+    """SQLite may return naive or aware datetimes; normalize for subtraction."""
+    if dt is None:
+        return None
+    if getattr(dt, "tzinfo", None) is not None:
+        return dt.replace(tzinfo=None)
+    return dt
+
 @router.get("/stores/{store_id}/funnel")
 def get_store_funnel(store_id: str, db: Session = Depends(get_db)):
     start_time, end_time = get_store_time_window(db, store_id)
@@ -66,10 +75,10 @@ def get_store_funnel(store_id: str, db: Session = Depends(get_db)):
 
             # 3. Purchase check (billing entry + 5 minute POS txn correlation)
             billing_evs = [ev for ev in ev_list if ev.zone_id == "BILLING" or ev.event_type == "BILLING_QUEUE_JOIN"]
-            billing_entry = min(ev.timestamp for ev in billing_evs)
+            billing_entry = _naive_dt(min(ev.timestamp for ev in billing_evs))
             
             for txn in transactions:
-                time_diff = (txn.timestamp - billing_entry).total_seconds()
+                time_diff = (_naive_dt(txn.timestamp) - billing_entry).total_seconds()
                 if 0 <= time_diff <= 300: # 5 minutes
                     purchases += 1
                     break

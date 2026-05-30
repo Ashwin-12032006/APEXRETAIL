@@ -1,39 +1,26 @@
 {
-  "_comment": "Dummy retail CCTV clips for demo. Replace local files or add store-specific URLs for production.",
+  "_comment": "User CCTV dataset: CAM 1-5 MP4 files in /assets/cctv/",
+  "camera_map": {
+    "CAM1": "entry.mp4",
+    "CAM2": "main_floor.mp4",
+    "CAM3": "billing.mp4",
+    "CAM4": "cam4.mp4",
+    "CAM5": "cam5.mp4"
+  },
   "default": {
-    "ENTRY": {
-      "label": "Entrance / footfall",
-      "sources": [
-        "https://assets.mixkit.co/videos/preview/mixkit-people-shopping-in-a-supermarket-40841-large.mp4",
-        "https://assets.mixkit.co/videos/preview/mixkit-people-walking-through-a-mall-4033-large.mp4",
-        "/assets/cctv/entry.mp4",
-        "/assets/cctv/entry.webm"
-      ]
-    },
-    "MAIN": {
-      "label": "Sales floor / aisles",
-      "sources": [
-        "https://assets.mixkit.co/videos/preview/mixkit-buyer-choosing-cosmetics-in-beauty-store-40854-large.mp4",
-        "https://assets.mixkit.co/videos/preview/mixkit-young-woman-buying-cosmetics-40855-large.mp4",
-        "/assets/cctv/main_floor.mp4",
-        "/assets/cctv/main_floor.webm"
-      ]
-    },
-    "BILL": {
-      "label": "Billing / checkout",
-      "sources": [
-        "https://assets.mixkit.co/videos/preview/mixkit-paying-at-the-cashier-in-a-supermarket-40843-large.mp4",
-        "https://assets.mixkit.co/videos/preview/mixkit-woman-paying-with-credit-card-at-checkout-40844-large.mp4",
-        "/assets/cctv/billing.mp4",
-        "/assets/cctv/billing.webm"
-      ]
-    }
+    "CAM1": { "label": "CAM 1", "sources": ["/assets/cctv/entry.mp4"] },
+    "CAM2": { "label": "CAM 2", "sources": ["/assets/cctv/main_floor.mp4"] },
+    "CAM3": { "label": "CAM 3", "sources": ["/assets/cctv/billing.mp4"] },
+    "CAM4": { "label": "CAM 4", "sources": ["/assets/cctv/cam4.mp4"] },
+    "CAM5": { "label": "CAM 5", "sources": ["/assets/cctv/cam5.mp4"] }
   },
   "stores": {
     "STORE_BLR_002": {
-      "ENTRY": { "sources": ["/assets/cctv/entry.mp4", "/assets/cctv/stores/STORE_BLR_002/entry.mp4"] },
-      "MAIN": { "sources": ["/assets/cctv/main_floor.mp4", "/assets/cctv/stores/STORE_BLR_002/main_floor.mp4"] },
-      "BILL": { "sources": ["/assets/cctv/billing.mp4", "/assets/cctv/stores/STORE_BLR_002/billing.mp4"] }
+      "CAM1": { "sources": ["/assets/cctv/entry.mp4"] },
+      "CAM2": { "sources": ["/assets/cctv/main_floor.mp4"] },
+      "CAM3": { "sources": ["/assets/cctv/billing.mp4"] },
+      "CAM4": { "sources": ["/assets/cctv/cam4.mp4"] },
+      "CAM5": { "sources": ["/assets/cctv/cam5.mp4"] }
     }
   }
 }

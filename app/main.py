@@ -22,12 +22,22 @@ try:
 except Exception as e:
     print(f"Database table initialization failed: {e}", file=sys.stderr)
 
-# Start real-time store simulator background thread
+# Seed funnel / heatmap / KPI data (5-camera footprint) when DB is sparse
 try:
-    from app.live_simulator import start_live_simulator
-    start_live_simulator()
+    from app.seed_data import ensure_analytics_data
+    ensure_analytics_data("STORE_BLR_002")
 except Exception as e:
-    print(f"Live simulator start failed: {e}", file=sys.stderr)
+    print(f"Analytics seed skipped: {e}", file=sys.stderr)
+
+# Live simulator off by default — dashboard CCTV ingest + startup seed populate analytics
+if os.getenv("ENABLE_LIVE_SIMULATOR", "false").lower() in ("1", "true", "yes"):
+    try:
+        from app.live_simulator import start_live_simulator
+        start_live_simulator()
+    except Exception as e:
+        print(f"Live simulator start failed: {e}", file=sys.stderr)
+else:
+    print("Live simulator disabled (ENABLE_LIVE_SIMULATOR=false)", file=sys.stderr)
 
 app = FastAPI(
     title="Apex Retail Store Intelligence API",

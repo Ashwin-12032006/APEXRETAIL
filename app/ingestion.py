@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status, Response
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
-from app.database import get_db
+from app.database import get_db, db_write_lock
 from app.models import EventSchema, EventDB
 from datetime import datetime
 import json
@@ -97,11 +97,12 @@ def ingest_events(payload: List[Dict[str, Any]], response: Response, db: Session
                 "error": f"Internal mapping error: {str(e)}"
             })
 
-    # Bulk insert
+    # Bulk insert (serialized with simulator/seed writes)
     if events_to_insert:
         try:
-            db.bulk_save_objects(events_to_insert)
-            db.commit()
+            with db_write_lock:
+                db.bulk_save_objects(events_to_insert)
+                db.commit()
             ingested_count = len(events_to_insert)
         except Exception as e:
             db.rollback()

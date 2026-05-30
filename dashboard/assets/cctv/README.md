@@ -1,34 +1,31 @@
-# CCTV dummy & real shop videos
+# CCTV footage (your dataset)
 
-Place MP4 or WebM files here so the dashboard plays **same-origin** footage (faces visible, face-crop overlays work).
+## Installed dataset
 
-## Quick setup (dummy retail footage)
+Extracted from: `CCTV Footage-20260529T160731Z-3-00144614ea.zip`
 
-1. Download 3 free clips (people in supermarket / beauty store / checkout), for example from [Mixkit](https://mixkit.co/free-stock-video/shopping/).
-2. Rename and copy into this folder:
+| Dashboard camera | Source file | Local path |
+|------------------|-------------|------------|
+| CAM_ENTRY | CAM 1.mp4 | `/assets/cctv/entry.mp4` |
+| CAM_MAIN | CAM 2.mp4 | `/assets/cctv/main_floor.mp4` |
+| CAM_BILL | CAM 3.mp4 | `/assets/cctv/billing.mp4` |
+| (extra) | CAM 4.mp4 | `/assets/cctv/cam4.mp4` |
+| (extra) | CAM 5.mp4 | `/assets/cctv/cam5.mp4` |
 
-| File | Camera | Suggested content |
-|------|--------|-------------------|
-| `entry.mp4` | CAM_ENTRY | Shoppers entering / mall aisle |
-| `main_floor.mp4` | CAM_MAIN | Aisle / cosmetics browsing |
-| `billing.mp4` | CAM_BILL | Checkout / card payment |
+Files are **hard-linked** to `_extracted/CCTV Footage/` (no extra disk copy).
 
-3. Hard-refresh the dashboard: http://localhost:8000/
+## View on dashboard
 
-## Per-store real footage (later)
+1. Start API: `uvicorn app.main:app --reload --port 8000`
+2. Open http://localhost:8000/
+3. Use **CAM_ENTRY**, **CAM_MAIN**, **CAM_BILL** buttons and PiP tiles.
 
-Copy your shop recordings to:
+Config: `dashboard/assets/cctv-feeds.json`
 
-```text
-dashboard/assets/cctv/stores/<STORE_ID>/entry.mp4
-dashboard/assets/cctv/stores/<STORE_ID>/main_floor.mp4
-dashboard/assets/cctv/stores/<STORE_ID>/billing.mp4
-```
+## Replace or add shop footage later
 
-Example: `stores/STORE_BLR_002/entry.mp4`
+1. Drop new MP4s into this folder (or `stores/<STORE_ID>/`).
+2. Edit `cctv-feeds.json` → set `sources` to your file paths (first match wins).
+3. Hard-refresh the browser (Ctrl+Shift+R).
 
-Paths are listed in `dashboard/cctv-feeds.json` under `stores`. You can also add **HTTPS/RTSP proxy URLs** as extra entries in `sources` (browser needs direct MP4/WebM URL).
-
-## Config file
-
-Edit `dashboard/cctv-feeds.json` to change source order or add stores. First URL that loads wins.
+**Note:** Each clip is large (~70–190 MB). First load may take a few seconds; clips loop automatically.

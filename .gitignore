@@ -17,7 +17,14 @@ htmlcov/
 data/store_intelligence.db
 data/*.db
 data/*.db-journal
+data/*.db-shm
+data/*.db-wal
 
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Large CCTV video files (use local dataset; see dashboard/assets/cctv/README.md)
+dashboard/assets/cctv/*.mp4
+dashboard/assets/cctv/*.webm
+dashboard/assets/cctv/_extracted/

@@ -4,13 +4,20 @@ import uuid
 import threading
 from datetime import datetime
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from sqlalchemy.exc import OperationalError
+from app.database import SessionLocal, db_write_lock
 from app.models import EventDB, TransactionDB
 
 # Active customer tracking state
 # Format: {visitor_id: {state: 'entered'|'skincare'|'haircare'|'billing', entry_time: datetime, zone_entry_time: datetime, dwell_ms: int, session_seq: int}}
 active_shoppers = {}
 state_lock = threading.Lock()
+
+
+def safe_commit(db: Session) -> None:
+    with db_write_lock:
+        db.commit()
+
 
 def simulate_realtime_traffic():
     """Background loop that continuously inserts realistic tracking events and POS transactions."""
@@ -20,8 +27,9 @@ def simulate_realtime_traffic():
     store_id = "STORE_BLR_002"
     
     while True:
+        db: Session = None
         try:
-            db: Session = SessionLocal()
+            db = SessionLocal()
             now = datetime.utcnow()
             
             with state_lock:
@@ -64,7 +72,7 @@ def simulate_realtime_traffic():
                         session_seq=1
                     )
                     db.add(event)
-                    db.commit()
+                    safe_commit(db)
                     # print(f"[Sim] Customer entered: {visitor_id}")
                     
                 elif action == 'move_zone':
@@ -94,7 +102,7 @@ def simulate_realtime_traffic():
                             session_seq=info['session_seq']
                         )
                         db.add(event)
-                        db.commit()
+                        safe_commit(db)
                         # print(f"[Sim] Customer {visitor_id} entered zone {zone}")
                         
                 elif action == 'dwell_zone':
@@ -126,7 +134,7 @@ def simulate_realtime_traffic():
                             session_seq=info['session_seq']
                         )
                         db.add(event)
-                        db.commit()
+                        safe_commit(db)
                         # print(f"[Sim] Customer {visitor_id} dwelled in {zone} for {info['dwell_ms']}ms")
                         
                 elif action == 'checkout_join':
@@ -199,7 +207,7 @@ def simulate_realtime_traffic():
                             session_seq=info['session_seq']
                         )
                         db.add(join_event)
-                        db.commit()
+                        safe_commit(db)
                         # print(f"[Sim] Customer {visitor_id} joined billing queue (depth {queue_depth})")
                         
                 elif action == 'checkout_complete':
@@ -264,7 +272,7 @@ def simulate_realtime_traffic():
                             session_seq=info['session_seq']
                         )
                         db.add(store_exit)
-                        db.commit()
+                        safe_commit(db)
                         
                         # Remove from active shoppers
                         active_shoppers.pop(visitor_id)
@@ -289,15 +297,24 @@ def simulate_realtime_traffic():
                         session_seq=random.randint(1, 15)
                     )
                     db.add(event)
-                    db.commit()
+                    safe_commit(db)
                     # print(f"[Sim] Staff {staff_id} moved around")
                     
-            db.close()
-        except Exception as e:
+        except OperationalError as e:
+            if db:
+                db.rollback()
             print(f"[Sim Error] {e}")
+            time.sleep(1)
+        except Exception as e:
+            if db:
+                db.rollback()
+            print(f"[Sim Error] {e}")
+        finally:
+            if db:
+                db.close()
             
-        # Run every 4 seconds to simulate active store timeline
-        time.sleep(4)
+        # Run every 8 seconds to reduce SQLite write pressure
+        time.sleep(8)
 
 def start_live_simulator():
     """Starts the real-time store simulation in a daemon thread."""
