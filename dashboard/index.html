@@ -2005,8 +2005,18 @@
                     iconName = 'info';
                 }
 
-                // Format timestamp
-                const tsFormatted = a.timestamp ? a.timestamp.split("T")[1].substring(0,8) : "";
+                // Format timestamp safely
+                let tsFormatted = "";
+                if (a.timestamp) {
+                    if (a.timestamp.includes("T")) {
+                        const parts = a.timestamp.split("T");
+                        if (parts[1]) {
+                            tsFormatted = parts[1].substring(0, 8);
+                        }
+                    } else {
+                        tsFormatted = a.timestamp;
+                    }
+                }
 
                 html += `
                     <div class="anomaly-item ${severityColor}">
