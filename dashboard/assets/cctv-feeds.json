@@ -1,0 +1,39 @@
+{
+  "_comment": "Dummy retail CCTV clips for demo. Replace local files or add store-specific URLs for production.",
+  "default": {
+    "ENTRY": {
+      "label": "Entrance / footfall",
+      "sources": [
+        "https://assets.mixkit.co/videos/preview/mixkit-people-shopping-in-a-supermarket-40841-large.mp4",
+        "https://assets.mixkit.co/videos/preview/mixkit-people-walking-through-a-mall-4033-large.mp4",
+        "/assets/cctv/entry.mp4",
+        "/assets/cctv/entry.webm"
+      ]
+    },
+    "MAIN": {
+      "label": "Sales floor / aisles",
+      "sources": [
+        "https://assets.mixkit.co/videos/preview/mixkit-buyer-choosing-cosmetics-in-beauty-store-40854-large.mp4",
+        "https://assets.mixkit.co/videos/preview/mixkit-young-woman-buying-cosmetics-40855-large.mp4",
+        "/assets/cctv/main_floor.mp4",
+        "/assets/cctv/main_floor.webm"
+      ]
+    },
+    "BILL": {
+      "label": "Billing / checkout",
+      "sources": [
+        "https://assets.mixkit.co/videos/preview/mixkit-paying-at-the-cashier-in-a-supermarket-40843-large.mp4",
+        "https://assets.mixkit.co/videos/preview/mixkit-woman-paying-with-credit-card-at-checkout-40844-large.mp4",
+        "/assets/cctv/billing.mp4",
+        "/assets/cctv/billing.webm"
+      ]
+    }
+  },
+  "stores": {
+    "STORE_BLR_002": {
+      "ENTRY": { "sources": ["/assets/cctv/entry.mp4", "/assets/cctv/stores/STORE_BLR_002/entry.mp4"] },
+      "MAIN": { "sources": ["/assets/cctv/main_floor.mp4", "/assets/cctv/stores/STORE_BLR_002/main_floor.mp4"] },
+      "BILL": { "sources": ["/assets/cctv/billing.mp4", "/assets/cctv/stores/STORE_BLR_002/billing.mp4"] }
+    }
+  }
+}

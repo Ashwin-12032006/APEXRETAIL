@@ -16,6 +16,7 @@ htmlcov/
 # Local SQLite Database
 data/store_intelligence.db
 data/*.db
+data/*.db-journal
 
 # OS Files
 .DS_Store

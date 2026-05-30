@@ -695,10 +695,52 @@
             z-index: 5;
         }
 
-        #cvCanvas {
+        .cv-main-video,
+        .cv-pip-video {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            background: #020308;
+        }
+
+        #cvCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 6;
             display: block;
+            pointer-events: auto;
+        }
+
+        .cv-video-hint {
+            position: absolute;
+            inset: 0;
+            z-index: 4;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            text-align: center;
+            background: rgba(2, 3, 8, 0.92);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+
+        .cv-video-hint.visible {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cv-video-hint code {
+            color: #00ff66;
+            font-size: 0.75rem;
         }
 
         .camera-selector-bar {
@@ -1121,6 +1163,103 @@
             font-weight: bold;
             font-size: 0.55rem;
         }
+
+        .cv-feed-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-family: monospace;
+            font-size: 0.68rem;
+        }
+
+        .cv-feed-stat {
+            background: rgba(0, 255, 102, 0.06);
+            border: 1px solid rgba(0, 255, 102, 0.18);
+            color: #00ff66;
+            padding: 0.25rem 0.55rem;
+            border-radius: 6px;
+        }
+
+        .cv-pip-strip {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .cv-pip-tile {
+            position: relative;
+            height: 72px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+            background: #020308;
+            cursor: pointer;
+            transition: border-color 0.25s, box-shadow 0.25s;
+        }
+
+        .cv-pip-tile:hover,
+        .cv-pip-tile.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 12px var(--primary-glow);
+        }
+
+        .cv-pip-tile canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+        }
+
+        .cv-pip-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 2px 6px;
+            font-size: 0.55rem;
+            font-family: monospace;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+            color: #00ff66;
+            z-index: 2;
+        }
+
+        .cv-pip-live {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            font-size: 0.5rem;
+            font-family: monospace;
+            color: #ff3b30;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .cv-pip-live::before {
+            content: '';
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #ff3b30;
+            box-shadow: 0 0 6px #ff3b30;
+            animation: pulse-red 1s infinite;
+        }
+
+        .cv-monitor-box {
+            height: 420px;
+        }
+
+        .cv-face-avatar {
+            width: 36px;
+            height: 36px;
+        }
+
+        .cv-face-sidebar {
+            width: 155px;
+        }
     </style>
 </head>
 <body>
@@ -1235,10 +1374,16 @@
                 <div class="panel-header">
                     <div class="panel-title">
                         <i data-lucide="video" style="color: var(--primary); width: 18px; height: 18px;"></i>
-                        <span>CCTV Visual Ingestion Feed (Real-Time Object Detection)</span>
+                        <span>Live CCTV Feeds — Face Detection &amp; Re-ID</span>
                     </div>
                 </div>
                 <div class="panel-body">
+                    <div class="cv-feed-stats" onclick="event.stopPropagation()">
+                        <span class="cv-feed-stat" id="cv-stat-fps">30 FPS</span>
+                        <span class="cv-feed-stat" id="cv-stat-faces">0 faces tracked</span>
+                        <span class="cv-feed-stat" id="cv-stat-res">1080p H.264</span>
+                        <span class="cv-feed-stat">YOLOv8-Face + Re-ID</span>
+                    </div>
                     <div class="camera-selector-bar" onclick="event.stopPropagation()">
                         <button class="cam-btn active" id="btn-cam-entry" onclick="switchCamera('ENTRY')">CAM_ENTRY (Entrance)</button>
                         <button class="cam-btn" id="btn-cam-main" onclick="switchCamera('MAIN')">CAM_MAIN (Sales Floor)</button>
@@ -1249,9 +1394,33 @@
                             <div><span class="cv-rec-dot"></span><span id="cv-cam-name">CAM_ENTRY_02</span></div>
                             <div id="cv-timestamp">2026-05-30 14:40:00.125</div>
                         </div>
+                        <video id="cvMainVideo" class="cv-main-video" muted loop playsinline autoplay></video>
+                        <div class="cv-video-hint" id="cv-video-hint">
+                            <strong style="color:#f1f3f9;margin-bottom:0.5rem;">No CCTV video loaded</strong>
+                            <span>Add dummy retail MP4s to <code>dashboard/assets/cctv/</code><br>
+                            (<code>entry.mp4</code>, <code>main_floor.mp4</code>, <code>billing.mp4</code>)<br>
+                            or run <code>scripts\download_cctv_samples.ps1</code></span>
+                        </div>
                         <div class="cv-scanlines"></div>
                         <div class="cv-face-sidebar" id="cv-face-sidebar"></div>
                         <canvas id="cvCanvas"></canvas>
+                    </div>
+                    <div class="cv-pip-strip" onclick="event.stopPropagation()">
+                        <div class="cv-pip-tile active" id="pip-entry" onclick="switchCamera('ENTRY')" title="Switch to entrance camera">
+                            <span class="cv-pip-live">LIVE</span>
+                            <video id="pipVideoEntry" class="cv-pip-video" muted loop playsinline autoplay></video>
+                            <span class="cv-pip-label">CAM_ENTRY</span>
+                        </div>
+                        <div class="cv-pip-tile" id="pip-main" onclick="switchCamera('MAIN')" title="Switch to sales floor camera">
+                            <span class="cv-pip-live">LIVE</span>
+                            <video id="pipVideoMain" class="cv-pip-video" muted loop playsinline autoplay></video>
+                            <span class="cv-pip-label">CAM_MAIN</span>
+                        </div>
+                        <div class="cv-pip-tile" id="pip-bill" onclick="switchCamera('BILL')" title="Switch to billing camera">
+                            <span class="cv-pip-live">LIVE</span>
+                            <video id="pipVideoBill" class="cv-pip-video" muted loop playsinline autoplay></video>
+                            <span class="cv-pip-label">CAM_BILL</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1478,33 +1647,39 @@
         function updateFaceSidebar() {
             const sidebar = document.getElementById('cv-face-sidebar');
             if (!sidebar) return;
-            
+
+            const visible = visualizerVisitors.length
+                ? visualizerVisitors
+                : allStoreShoppers.filter(s => {
+                    if (activeCamera === 'ENTRY') return s.current_zone === 'ENTRY';
+                    if (activeCamera === 'MAIN') return s.current_zone === 'SKINCARE' || s.current_zone === 'HAIRCARE';
+                    if (activeCamera === 'BILL') return s.current_zone === 'BILLING';
+                    return false;
+                });
+
+            const facesEl = document.getElementById('cv-stat-faces');
+            if (facesEl) facesEl.textContent = `${visible.length} face${visible.length === 1 ? '' : 's'} tracked`;
+
             let html = '';
-            let cameraVisitors = [];
-            
-            if (activeCamera === 'ENTRY') {
-                cameraVisitors = ['VIS_custA01', 'VIS_custB02', 'VIS_staff01'];
-            } else if (activeCamera === 'MAIN') {
-                cameraVisitors = ['VIS_custA01', 'VIS_custC02'];
-            } else if (activeCamera === 'BILL') {
-                cameraVisitors = ['VIS_custA01', 'VIS_custC02', 'VIS_custD03'];
-            }
-            
-            cameraVisitors.forEach(vid => {
-                const f = faceDatabase[vid];
-                if (f) {
-                    html += `
-                        <div class="cv-face-card" onclick="openFaceEmbeddingModal('${vid}'); event.stopPropagation();">
-                            <img src="${f.img}" class="cv-face-avatar">
-                            <div class="cv-face-info">
-                                <span class="cv-face-id">${f.name}</span>
-                                <span class="cv-face-match">${f.match} match</span>
-                            </div>
+            visible.forEach(v => {
+                const f = faceDatabase[v.id];
+                const imgSrc = liveFaceCache[v.id] || (f && f.img) || '';
+                const match = f ? f.match : `${Math.round(v.conf * 100)}%`;
+                const roleTag = v.is_staff ? ' · STAFF' : '';
+                html += `
+                    <div class="cv-face-card" onclick="openFaceEmbeddingModal('${v.id}'); event.stopPropagation();" title="Live crop from ${document.getElementById('cv-cam-name').textContent}">
+                        <img src="${imgSrc}" class="cv-face-avatar" alt="${v.id}" onerror="this.src='${f ? f.img : ''}'">
+                        <div class="cv-face-info">
+                            <span class="cv-face-id">${v.id}${roleTag}</span>
+                            <span class="cv-face-match">${match} Re-ID</span>
                         </div>
-                    `;
-                }
+                    </div>
+                `;
             });
-            
+
+            if (!html) {
+                html = '<div style="font-size:0.6rem;color:#8a99ad;font-family:monospace;padding:4px;">Scanning for faces…</div>';
+            }
             sidebar.innerHTML = html;
         }
 
@@ -1523,9 +1698,10 @@
                 vectorHtml += `<div class="vector-element" style="background: rgba(0, 255, 102, ${val})">${val}</div>`;
             });
             
+            const profileImg = liveFaceCache[vid] || f.img;
             bodyContent.innerHTML = `
                 <div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 1.5rem;">
-                    <img src="${f.img}" style="width: 120px; height: 120px; border-radius: 12px; border: 2px solid var(--primary); object-fit: cover;">
+                    <img src="${profileImg}" style="width: 120px; height: 120px; border-radius: 12px; border: 2px solid var(--primary); object-fit: cover;">
                     <div style="flex: 1;">
                         <h4 style="margin: 0 0 8px 0; color: #fff;">Visitor ID: ${f.name}</h4>
                         <div style="margin-bottom: 6px;"><strong>Role:</strong> <span class="${f.role === 'STAFF' ? 'badge-staff' : 'badge-cust'}">${f.role}</span></div>
@@ -1549,19 +1725,110 @@
         let cvCanvas, cvCtx;
         let visualizerVisitors = [];
         
-        // --- Real-world CCTV Video Feeds Configuration ---
-        const videoFeeds = {
-            'ENTRY': 'https://assets.mixkit.co/videos/preview/mixkit-people-shopping-in-a-supermarket-40841-large.mp4',
-            'MAIN': 'https://assets.mixkit.co/videos/preview/mixkit-buyer-choosing-cosmetics-in-beauty-store-40854-large.mp4',
-            'BILL': 'https://assets.mixkit.co/videos/preview/mixkit-paying-at-the-cashier-in-a-supermarket-40843-large.mp4'
+        // --- CCTV config: local dummy MP4s + optional per-store real footage (see /assets/cctv-feeds.json) ---
+        let cctvConfig = null;
+        const pipVideoMap = { ENTRY: 'pipVideoEntry', MAIN: 'pipVideoMain', BILL: 'pipVideoBill' };
+        const pipTileMap = { ENTRY: 'pip-entry', MAIN: 'pip-main', BILL: 'pip-bill' };
+        const cameraAnchors = {
+            ENTRY: { VIS_custB02: { pctX: 0.38, pctY: 0.58 } },
+            MAIN: { VIS_custA01: { pctX: 0.55, pctY: 0.42 }, VIS_staff01: { pctX: 0.72, pctY: 0.38 } },
+            BILL: { VIS_custC02: { pctX: 0.48, pctY: 0.52 }, VIS_custD03: { pctX: 0.62, pctY: 0.54 } }
         };
         let activeVideoElement = null;
-        let loadedVideos = {};
+        let liveFaceCache = {};
+        let faceImgCache = {};
+        let faceCropFrameCounter = 0;
+        let cvFrameCounter = 0;
+        let lastFpsTime = performance.now();
+        let displayedFps = 30;
+        let mainVideoReady = false;
+
+        async function loadCctvConfig() {
+            try {
+                const res = await fetch('/assets/cctv-feeds.json');
+                if (res.ok) cctvConfig = await res.json();
+            } catch (e) {
+                console.warn('CCTV config load failed', e);
+            }
+            if (!cctvConfig) {
+                cctvConfig = {
+                    default: {
+                        ENTRY: { sources: ['/assets/cctv/entry.mp4', 'https://assets.mixkit.co/videos/preview/mixkit-people-shopping-in-a-supermarket-40841-large.mp4'] },
+                        MAIN: { sources: ['/assets/cctv/main_floor.mp4', 'https://assets.mixkit.co/videos/preview/mixkit-buyer-choosing-cosmetics-in-beauty-store-40854-large.mp4'] },
+                        BILL: { sources: ['/assets/cctv/billing.mp4', 'https://assets.mixkit.co/videos/preview/mixkit-paying-at-the-cashier-in-a-supermarket-40843-large.mp4'] }
+                    },
+                    stores: {}
+                };
+            }
+        }
+
+        function getCctvSources(camType) {
+            const storeSources = cctvConfig?.stores?.[selectedStore]?.[camType]?.sources || [];
+            const defaultSources = cctvConfig?.default?.[camType]?.sources || [];
+            const merged = [...storeSources, ...defaultSources];
+            const seen = new Set();
+            return merged.filter(src => {
+                if (!src || seen.has(src)) return false;
+                seen.add(src);
+                return true;
+            });
+        }
+
+        function applyVideoSources(videoEl, camType) {
+            if (!videoEl) return;
+            const sources = getCctvSources(camType);
+            let idx = 0;
+            const hint = document.getElementById('cv-video-hint');
+
+            function tryNext() {
+                if (idx >= sources.length) {
+                    if (videoEl.id === 'cvMainVideo' && hint) hint.classList.add('visible');
+                    return;
+                }
+                const src = sources[idx++];
+                videoEl.src = src;
+                videoEl.load();
+            }
+
+            videoEl.onloadeddata = () => {
+                if (videoEl.id === 'cvMainVideo') {
+                    mainVideoReady = true;
+                    if (hint) hint.classList.remove('visible');
+                }
+                videoEl.play().catch(() => {});
+            };
+            videoEl.onerror = tryNext;
+            tryNext();
+        }
+
+        function getFaceImg(visitorId) {
+            if (faceImgCache[visitorId]) return faceImgCache[visitorId];
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            const fb = faceDatabase[visitorId];
+            img.src = liveFaceCache[visitorId] || (fb && fb.img) || '';
+            faceImgCache[visitorId] = img;
+            return img;
+        }
+
+        function syncAnchoredShoppers() {
+            if (!cvCanvas || !cvCanvas.width) return;
+            allStoreShoppers.forEach(s => {
+                const anchors = cameraAnchors[activeCamera];
+                if (!anchors || !anchors[s.id]) return;
+                const a = anchors[s.id];
+                const w = s.w || 48;
+                const h = s.h || 92;
+                const t = Date.now() * 0.001 + s.id.length;
+                s.x = cvCanvas.width * a.pctX - w / 2 + Math.sin(t) * 12;
+                s.y = cvCanvas.height * a.pctY - h / 2 + Math.cos(t * 0.9) * 8;
+            });
+        }
 
         // Unified persistent global store roster to prevent dots disappearing
         let allStoreShoppers = [
             { id: 'VIS_custA01', is_staff: false, conf: 0.96, color: '#00ff66', current_zone: 'SKINCARE', path: ['ENTRY', 'SKINCARE'], x: 500, y: 110, dx: 0.6, dy: -0.4, w: 45, h: 90, zoneTimer: 300, face: '/assets/shopper1.png', mapX: 75, mapY: 25 },
-            { id: 'VIS_custB02', is_staff: false, conf: 0.94, color: '#a8a5e6', current_zone: 'HAIRCARE', path: ['ENTRY', 'HAIRCARE'], x: 480, y: 220, dx: -0.5, dy: 0.6, w: 45, h: 90, zoneTimer: 450, face: '/assets/shopper2.png', mapX: 75, mapY: 75 },
+            { id: 'VIS_custB02', is_staff: false, conf: 0.94, color: '#a8a5e6', current_zone: 'ENTRY', path: ['ENTRY'], x: 180, y: 120, dx: 0.3, dy: 0.8, w: 48, h: 95, zoneTimer: 450, face: '/assets/shopper2.png', mapX: 20, mapY: 15 },
             { id: 'VIS_custC02', is_staff: false, conf: 0.95, color: '#f59e0b', current_zone: 'BILLING', path: ['ENTRY', 'HAIRCARE', 'BILLING'], x: 220, y: 170, dx: 0, dy: 0, w: 48, h: 95, queue_idx: 1, face: '/assets/shopper3.png', mapX: 25, mapY: 75 },
             { id: 'VIS_custD03', is_staff: false, conf: 0.97, color: '#f59e0b', current_zone: 'BILLING', path: ['ENTRY', 'SKINCARE', 'BILLING'], x: 150, y: 170, dx: 0, dy: 0, w: 48, h: 95, queue_idx: 0, face: '/assets/shopper1.png', mapX: 25, mapY: 75 },
             { id: 'VIS_staff01', is_staff: true, conf: 0.99, color: '#ff00ff', current_zone: 'SKINCARE', path: ['ENTRY', 'SKINCARE'], x: 320, y: 130, dx: 0.4, dy: 0.4, w: 45, h: 90, face: '/assets/staff1.png', mapX: 45, mapY: 40 }
@@ -1569,29 +1836,81 @@
 
         let visitorPathHistories = {
             'VIS_custA01': ['ENTRY', 'SKINCARE'],
-            'VIS_custB02': ['ENTRY', 'HAIRCARE'],
+            'VIS_custB02': ['ENTRY'],
             'VIS_custC02': ['ENTRY', 'HAIRCARE', 'BILLING'],
             'VIS_custD03': ['ENTRY', 'SKINCARE', 'BILLING'],
             'VIS_staff01': ['ENTRY', 'SKINCARE']
         };
 
-        function getOrCreateVideo(camType) {
-            if (loadedVideos[camType]) {
-                return loadedVideos[camType];
+        function preloadAllCameraFeeds() {
+            ['ENTRY', 'MAIN', 'BILL'].forEach(cam => {
+                const pipId = pipVideoMap[cam];
+                const pipEl = document.getElementById(pipId);
+                if (pipEl) applyVideoSources(pipEl, cam);
+            });
+            const main = document.getElementById('cvMainVideo');
+            if (main) applyVideoSources(main, activeCamera);
+            activeVideoElement = main;
+        }
+
+        function mapCanvasBoxToVideo(visitor, videoEl) {
+            const video = videoEl || activeVideoElement;
+            if (!video || !video.videoWidth) return null;
+            const scaleX = video.videoWidth / cvCanvas.width;
+            const scaleY = video.videoHeight / cvCanvas.height;
+            return {
+                x: visitor.x * scaleX,
+                y: visitor.y * scaleY,
+                w: visitor.w * scaleX,
+                h: visitor.h * scaleY
+            };
+        }
+
+        function captureVisitorFaceCrop(visitor, videoEl) {
+            const video = videoEl || activeVideoElement;
+            if (!video || video.readyState < 2 || !cvCanvas) return null;
+            const box = mapCanvasBoxToVideo(visitor);
+            if (!box) return null;
+            const fx = box.x + box.w * 0.12;
+            const fy = box.y + box.h * 0.02;
+            const fw = box.w * 0.76;
+            const fh = box.h * 0.42;
+            if (fw < 8 || fh < 8) return null;
+            const faceCanvas = document.createElement('canvas');
+            faceCanvas.width = 64;
+            faceCanvas.height = 64;
+            const fctx = faceCanvas.getContext('2d');
+            try {
+                fctx.drawImage(video, fx, fy, fw, fh, 0, 0, 64, 64);
+                return faceCanvas.toDataURL('image/jpeg', 0.82);
+            } catch (e) {
+                return null;
             }
-            const video = document.createElement('video');
-            video.src = videoFeeds[camType];
-            video.loop = true;
-            video.muted = true;
-            video.playsInline = true;
-            video.autoplay = true;
-            video.crossOrigin = 'anonymous';
-            video.style.display = 'none';
-            document.body.appendChild(video);
-            
-            video.play().catch(e => console.log('Video play error:', e));
-            loadedVideos[camType] = video;
-            return video;
+        }
+
+        function refreshLiveFaceCrops() {
+            faceCropFrameCounter++;
+            if (faceCropFrameCounter % 12 !== 0) return;
+            visualizerVisitors.forEach(v => {
+                const crop = captureVisitorFaceCrop(v);
+                if (crop) liveFaceCache[v.id] = crop;
+            });
+            if (faceCropFrameCounter % 36 === 0) updateFaceSidebar();
+        }
+
+        function reloadCctvForStore() {
+            mainVideoReady = false;
+            preloadAllCameraFeeds();
+            applyVideoSources(document.getElementById('cvMainVideo'), activeCamera);
+            activeVideoElement = document.getElementById('cvMainVideo');
+            updateFaceSidebar();
+        }
+
+        function updatePipActiveState() {
+            Object.keys(pipTileMap).forEach(cam => {
+                const el = document.getElementById(pipTileMap[cam]);
+                if (el) el.classList.toggle('active', cam === activeCamera);
+            });
         }
         
         function initCVVisualizer() {
@@ -1607,8 +1926,9 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
-            // Initiate entry video
-            activeVideoElement = getOrCreateVideo('ENTRY');
+            activeVideoElement = document.getElementById('cvMainVideo');
+            preloadAllCameraFeeds();
+            updatePipActiveState();
             
             // Add click listener on CCTV Canvas for Interactive Bounding Box Tracking
             cvCanvas.style.cursor = 'crosshair';
@@ -1660,16 +1980,11 @@
                 document.getElementById('cv-cam-name').textContent = 'CAM_BILL_02';
             }
             
-            // Pause previous video and play selected feed
-            if (activeVideoElement) {
-                activeVideoElement.pause();
-            }
-            activeVideoElement = getOrCreateVideo(camType);
-            activeVideoElement.play().catch(e => console.log('Video play error:', e));
-            
-            // Update the floating face Re-ID cards
+            activeVideoElement = document.getElementById('cvMainVideo');
+            mainVideoReady = false;
+            applyVideoSources(activeVideoElement, camType);
+            updatePipActiveState();
             updateFaceSidebar();
-            
             showToast(`Switched CCTV angle to ${camType}`);
         }
 
@@ -1678,7 +1993,11 @@
 
         // Shopper coordinates and state machine updater running every frame
         function updateShopperDetections() {
+            syncAnchoredShoppers();
             allStoreShoppers.forEach(s => {
+                if (cameraAnchors[activeCamera] && cameraAnchors[activeCamera][s.id]) {
+                    return;
+                }
                 if (s.is_staff) {
                     // Staff wanders across skincare and haircare shelf areas forever
                     s.x += s.dx;
@@ -1825,24 +2144,28 @@
 
         function cvAnimationLoop() {
             if (!cvCtx || !cvCanvas) return;
-            
+
+            cvFrameCounter++;
+            const nowPerf = performance.now();
+            if (nowPerf - lastFpsTime >= 1000) {
+                displayedFps = cvFrameCounter;
+                cvFrameCounter = 0;
+                lastFpsTime = nowPerf;
+                const fpsEl = document.getElementById('cv-stat-fps');
+                if (fpsEl) fpsEl.textContent = `${displayedFps} FPS`;
+            }
             // Ticking CCTV Milliseconds Timestamp
             const now = new Date();
             const timeStr = now.toISOString().replace('T', ' ').replace('Z', '') + '.' + String(now.getMilliseconds()).padStart(3, '0');
             const tsEl = document.getElementById('cv-timestamp');
             if (tsEl) tsEl.textContent = timeStr;
-            
-            // 1. Draw Real Stock Video Frames directly on Canvas!
+
+            cvCtx.clearRect(0, 0, cvCanvas.width, cvCanvas.height);
             if (activeVideoElement && activeVideoElement.readyState >= 2) {
-                cvCtx.drawImage(activeVideoElement, 0, 0, cvCanvas.width, cvCanvas.height);
-                cvCtx.fillStyle = 'rgba(2, 3, 8, 0.45)';
-                cvCtx.fillRect(0, 0, cvCanvas.width, cvCanvas.height);
-            } else {
-                cvCtx.fillStyle = '#020308';
-                cvCtx.fillRect(0, 0, cvCanvas.width, cvCanvas.height);
-                cvCtx.fillStyle = '#8a99ad';
-                cvCtx.font = '14px sans-serif';
-                cvCtx.fillText('Loading Camera Video Feed...', cvCanvas.width/2 - 100, cvCanvas.height/2);
+                const resEl = document.getElementById('cv-stat-res');
+                if (resEl && activeVideoElement.videoWidth) {
+                    resEl.textContent = `${activeVideoElement.videoWidth}×${activeVideoElement.videoHeight}`;
+                }
             }
             
             // Draw grid perspective overlay
@@ -1899,9 +2222,7 @@
                 cvCtx.stroke();
                 cvCtx.setLineDash([]);
                 
-                visualizerVisitors.forEach(v => {
-                    drawObjectBox(v);
-                });
+                visualizerVisitors.forEach(v => drawObjectBox(v));
             } else if (activeCamera === 'MAIN') {
                 // Draw Skincare Zone bounds and visual shelves
                 cvCtx.strokeStyle = 'rgba(108, 92, 231, 0.4)';
@@ -1937,9 +2258,7 @@
                 cvCtx.fillStyle = '#a8a5e6';
                 cvCtx.fillText('ZONE: HAIRCARE SHELF [CAM_MAIN]', cvCanvas.width - 170, 215);
                 
-                visualizerVisitors.forEach(v => {
-                    drawObjectBox(v);
-                });
+                visualizerVisitors.forEach(v => drawObjectBox(v));
             } else if (activeCamera === 'BILL') {
                 // Draw Billing Counter desk
                 cvCtx.fillStyle = 'rgba(16, 185, 129, 0.18)';
@@ -1977,10 +2296,10 @@
                 cvCtx.fillStyle = '#f59e0b';
                 cvCtx.fillText(`LIVE QUEUE DEPTH: ${visualizerVisitors.length}`, 80, 140);
                 
-                visualizerVisitors.forEach(v => {
-                    drawObjectBox(v);
-                });
+                visualizerVisitors.forEach(v => drawObjectBox(v));
             }
+
+            refreshLiveFaceCrops();
             
             if (flashEntryTimer > 0) {
                 flashEntryTimer--;
@@ -2005,23 +2324,90 @@
         }
 
         function drawObjectBox(v) {
+            const faceH = Math.round(v.h * 0.38);
+            const faceW = Math.round(v.w * 0.72);
+            const faceX = v.x + (v.w - faceW) / 2;
+            const faceY = v.y + 4;
+
             cvCtx.strokeStyle = v.color;
             cvCtx.lineWidth = 2.5;
             cvCtx.strokeRect(v.x, v.y, v.w, v.h);
-            
-            cvCtx.fillStyle = v.color + '22';
+
+            cvCtx.fillStyle = v.color + '18';
             cvCtx.fillRect(v.x, v.y, v.w, v.h);
-            
+
+            // Face detection sub-box (upper body / head region)
+            cvCtx.strokeStyle = '#00ffcc';
+            cvCtx.lineWidth = 1.5;
+            cvCtx.setLineDash([4, 3]);
+            cvCtx.strokeRect(faceX, faceY, faceW, faceH);
+            cvCtx.setLineDash([]);
+            cvCtx.fillStyle = 'rgba(0, 255, 204, 0.08)';
+            cvCtx.fillRect(faceX, faceY, faceW, faceH);
+
+            const thumb = 48;
+            const tx = v.x + v.w - thumb - 4;
+            const ty = v.y - thumb - 8;
+            const faceImg = getFaceImg(v.id);
+            let drewFace = false;
+            if (mainVideoReady && activeVideoElement && activeVideoElement.readyState >= 2) {
+                const box = mapCanvasBoxToVideo(v);
+                if (box) {
+                    try {
+                        const fx = box.x + box.w * 0.12;
+                        const fy = box.y + box.h * 0.02;
+                        const fw = box.w * 0.76;
+                        const fh = box.h * 0.42;
+                        cvCtx.save();
+                        cvCtx.strokeStyle = '#00ff66';
+                        cvCtx.lineWidth = 2;
+                        cvCtx.strokeRect(tx, ty, thumb, thumb);
+                        cvCtx.beginPath();
+                        cvCtx.rect(tx, ty, thumb, thumb);
+                        cvCtx.clip();
+                        cvCtx.drawImage(activeVideoElement, fx, fy, fw, fh, tx, ty, thumb, thumb);
+                        cvCtx.restore();
+                        drewFace = true;
+                    } catch (e) { /* local video only */ }
+                }
+            }
+            if (!drewFace && faceImg.complete && faceImg.naturalWidth) {
+                cvCtx.save();
+                cvCtx.strokeStyle = '#00ff66';
+                cvCtx.lineWidth = 2;
+                cvCtx.strokeRect(tx, ty, thumb, thumb);
+                cvCtx.beginPath();
+                cvCtx.rect(tx, ty, thumb, thumb);
+                cvCtx.clip();
+                cvCtx.drawImage(faceImg, tx, ty, thumb, thumb);
+                cvCtx.restore();
+                drewFace = true;
+            }
+            if (drewFace) {
+                cvCtx.fillStyle = '#00ff66';
+                cvCtx.font = 'bold 7px monospace';
+                cvCtx.fillText('FACE', tx + 2, ty + thumb + 9);
+            }
+
+            // Simulated facial landmarks
+            const lmY = faceY + faceH * 0.45;
+            const lmX = faceX + faceW * 0.5;
+            cvCtx.fillStyle = '#00ffcc';
+            [[0.35, 0.4], [0.65, 0.4], [0.5, 0.55], [0.4, 0.72], [0.6, 0.72]].forEach(([ox, oy]) => {
+                cvCtx.beginPath();
+                cvCtx.arc(faceX + faceW * ox, faceY + faceH * oy, 2, 0, Math.PI * 2);
+                cvCtx.fill();
+            });
+
             cvCtx.fillStyle = v.color;
             cvCtx.fillRect(v.x - 1, v.y - 15, v.w + 2, 16);
-            
             cvCtx.fillStyle = '#080a10';
             cvCtx.font = 'bold 9.5px monospace';
-            cvCtx.fillText(`${v.id} (${Math.round(v.conf*100)}%)`, v.x + 3, v.y - 4);
-            
+            cvCtx.fillText(`${v.id} (${Math.round(v.conf * 100)}%)`, v.x + 3, v.y - 4);
+
             cvCtx.fillStyle = v.color;
             cvCtx.beginPath();
-            cvCtx.arc(v.x + v.w/2, v.y + v.h, 4, 0, Math.PI*2);
+            cvCtx.arc(v.x + v.w / 2, v.y + v.h, 4, 0, Math.PI * 2);
             cvCtx.fill();
         }
 
@@ -2156,14 +2542,12 @@
         }
 
         // Start polling on load
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadCctvConfig();
             fetchData();
             startCountdownTimer();
             initCVVisualizer();
-            // Default select entry camera and update sidebar
-            setTimeout(() => {
-                switchCamera('ENTRY');
-            }, 100);
+            setTimeout(() => switchCamera('ENTRY'), 100);
         });
 
         function startCountdownTimer() {
@@ -2185,6 +2569,7 @@
             showLoadingSkeletons();
             fetchData();
             startCountdownTimer();
+            reloadCctvForStore();
             showToast(`Switched store layout to ${selectedStore}`);
         }
 
@@ -2710,11 +3095,8 @@
             
             let visitorsHtml = '';
             visualizerVisitors.forEach(v => {
-                let imgUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=150&h=150&q=80';
-                if (v.id === 'VIS_custB02') imgUrl = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?fit=crop&w=150&h=150&q=80';
-                else if (v.id === 'VIS_custC02') imgUrl = 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?fit=crop&w=150&h=150&q=80';
-                else if (v.is_staff) imgUrl = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?fit=crop&w=150&h=150&q=80';
-                else if (v.id === 'VIS_custD03') imgUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?fit=crop&w=150&h=150&q=80';
+                const fb = faceDatabase[v.id];
+                let imgUrl = liveFaceCache[v.id] || (fb && fb.img) || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=150&h=150&q=80';
                 
                 visitorsHtml += `
                     <div style="display: flex; align-items: center; gap: 12px; padding: 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; margin-bottom: 8px;">
