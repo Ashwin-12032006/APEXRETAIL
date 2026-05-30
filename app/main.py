@@ -6,6 +6,7 @@ import os
 from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
 from app.database import engine, Base
 from app.ingestion import router as ingestion_router
@@ -21,11 +22,24 @@ try:
 except Exception as e:
     print(f"Database table initialization failed: {e}", file=sys.stderr)
 
+# Start real-time store simulator background thread
+try:
+    from app.live_simulator import start_live_simulator
+    start_live_simulator()
+except Exception as e:
+    print(f"Live simulator start failed: {e}", file=sys.stderr)
+
 app = FastAPI(
     title="Apex Retail Store Intelligence API",
     description="Real-time CCTV-based store tracking and POS transaction analytics API.",
     version="1.0.0"
 )
+
+# Mount static assets directory
+dashboard_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dashboard")
+assets_dir = os.path.join(dashboard_dir, "assets")
+os.makedirs(assets_dir, exist_ok=True)
+app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
 # Enable CORS for frontend dashboard
 app.add_middleware(

@@ -840,6 +840,55 @@
             box-shadow: 0 0 12px #ff00ff;
         }
 
+        .visitor-dot.tracked {
+            background: #ff3b30;
+            box-shadow: 0 0 20px #ff3b30, 0 0 40px #ff3b30;
+            border-color: #ffffff;
+            z-index: 101;
+            animation: pulse-tracked 0.8s infinite alternate;
+        }
+
+        .visitor-dot.tracked::after {
+            background: #ff3b30;
+            color: #ffffff;
+            border-color: #ffffff;
+            font-weight: bold;
+            font-size: 0.75rem;
+            top: -22px;
+        }
+
+        @keyframes pulse-tracked {
+            0% { transform: translate(-50%, -50%) scale(1); }
+            100% { transform: translate(-50%, -50%) scale(1.3); }
+        }
+
+        /* SVG Path overlays for live path tracking */
+        .floor-path-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 90;
+        }
+
+        .floor-path-line {
+            fill: none;
+            stroke: #ff3b30;
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 8 4;
+            animation: dash-animation 1.5s linear infinite;
+        }
+
+        @keyframes dash-animation {
+            to {
+                stroke-dashoffset: -12;
+            }
+        }
+
         /* --- Interactive Modal Styling --- */
         .modal-overlay {
             position: fixed;
@@ -991,6 +1040,87 @@
             font-weight: bold;
             transition: all 0.3s;
         }
+
+        /* Circular Avatar Styles for tables */
+        .table-avatar-cell {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .table-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Floating Face Detection Sidebar */
+        .cv-face-sidebar {
+            position: absolute;
+            top: 50px;
+            right: 15px;
+            bottom: 45px;
+            width: 135px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: auto;
+            overflow-y: auto;
+            scrollbar-width: none; /* Firefox */
+        }
+        .cv-face-sidebar::-webkit-scrollbar {
+            display: none; /* WebKit */
+        }
+        .cv-face-card {
+            background: rgba(16, 20, 35, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(108, 92, 231, 0.25);
+            border-radius: 8px;
+            padding: 5px 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+        }
+        .cv-face-card:hover {
+            transform: translateX(-4px);
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(108, 92, 231, 0.2);
+            background: rgba(108, 92, 231, 0.1);
+        }
+        .cv-face-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1px solid #00ff66;
+            box-shadow: 0 0 4px rgba(0, 255, 102, 0.3);
+        }
+        .cv-face-info {
+            display: flex;
+            flex-direction: column;
+            font-family: monospace;
+            font-size: 0.6rem;
+            line-height: 1.2;
+        }
+        .cv-face-id {
+            color: #fff;
+            font-weight: bold;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+            width: 75px;
+        }
+        .cv-face-match {
+            color: #00ff66;
+            font-weight: bold;
+            font-size: 0.55rem;
+        }
     </style>
 </head>
 <body>
@@ -1101,7 +1231,7 @@
         <!-- Live CV Stream Visualizer & Store Layout Map -->
         <div class="visualizer-grid">
             <!-- CCTV Live Stream Visual Monitor -->
-            <div class="glass-panel">
+            <div class="glass-panel" onclick="openCCTVInspectorModal()" style="cursor: pointer;">
                 <div class="panel-header">
                     <div class="panel-title">
                         <i data-lucide="video" style="color: var(--primary); width: 18px; height: 18px;"></i>
@@ -1109,7 +1239,7 @@
                     </div>
                 </div>
                 <div class="panel-body">
-                    <div class="camera-selector-bar">
+                    <div class="camera-selector-bar" onclick="event.stopPropagation()">
                         <button class="cam-btn active" id="btn-cam-entry" onclick="switchCamera('ENTRY')">CAM_ENTRY (Entrance)</button>
                         <button class="cam-btn" id="btn-cam-main" onclick="switchCamera('MAIN')">CAM_MAIN (Sales Floor)</button>
                         <button class="cam-btn" id="btn-cam-bill" onclick="switchCamera('BILL')">CAM_BILL (Billing Counter)</button>
@@ -1120,6 +1250,7 @@
                             <div id="cv-timestamp">2026-05-30 14:40:00.125</div>
                         </div>
                         <div class="cv-scanlines"></div>
+                        <div class="cv-face-sidebar" id="cv-face-sidebar"></div>
                         <canvas id="cvCanvas"></canvas>
                     </div>
                 </div>
@@ -1134,15 +1265,19 @@
                     </div>
                 </div>
                 <div class="panel-body floor-plan-box">
-                    <div style="font-size: 0.8rem; color: var(--text-secondary);">
-                        CV Re-ID pipeline tracks customers spatial coordinates dynamically. Glowing indicators represent detected individuals.
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
+                        <span>CV Re-ID pipeline tracks customers spatial coordinates dynamically. Glowing indicators represent detected individuals.</span>
+                        <span id="active-track-indicator" style="display:none; font-weight:bold; color:#ff3b30; font-size:0.75rem;">
+                            TRACKING: <span id="tracked-visitor-name"></span> 
+                            <button onclick="clearTracking()" style="background:transparent; border:none; color:#8a99ad; text-decoration:underline; font-size:0.75rem; cursor:pointer; margin-left:5px;">[Clear]</button>
+                        </span>
                     </div>
                     <div class="floor-map-container" id="floor-map">
                         <!-- Zones outline -->
-                        <div class="floor-zone entry" style="top: 10px; left: 10px; width: 120px; height: 50px;">ENTRY / EXIT</div>
-                        <div class="floor-zone" id="map-zone-skindex" style="top: 10px; right: 10px; width: 160px; height: 100px;">SKINCARE ZONE</div>
-                        <div class="floor-zone" id="map-zone-hairdex" style="bottom: 10px; right: 10px; width: 160px; height: 100px;">HAIRCARE ZONE</div>
-                        <div class="floor-zone billing" id="map-zone-billingdex" style="bottom: 10px; left: 10px; width: 150px; height: 90px;">BILLING AREA & QUEUE</div>
+                        <div class="floor-zone entry" onclick="openZoneModal('ENTRY')" style="top: 10px; left: 10px; width: 120px; height: 50px; cursor: pointer;">ENTRY / EXIT</div>
+                        <div class="floor-zone" id="map-zone-skindex" onclick="openZoneModal('SKINCARE')" style="top: 10px; right: 10px; width: 160px; height: 100px; cursor: pointer;">SKINCARE ZONE</div>
+                        <div class="floor-zone" id="map-zone-hairdex" onclick="openZoneModal('HAIRCARE')" style="bottom: 10px; right: 10px; width: 160px; height: 100px; cursor: pointer;">HAIRCARE ZONE</div>
+                        <div class="floor-zone billing" id="map-zone-billingdex" onclick="openZoneModal('BILLING')" style="bottom: 10px; left: 10px; width: 150px; height: 90px; cursor: pointer;">BILLING AREA & QUEUE</div>
                     </div>
                 </div>
             </div>
@@ -1151,7 +1286,7 @@
         <!-- Main Analytics Grid -->
         <div class="dashboard-grid">
             <!-- Funnel Chart Card -->
-            <div class="glass-panel">
+            <div class="glass-panel" onclick="openFunnelModal()" style="cursor: pointer;">
                 <div class="panel-header">
                     <div class="panel-title">
                         <i data-lucide="filter" style="color: var(--primary); width: 18px; height: 18px;"></i>
@@ -1169,7 +1304,7 @@
             </div>
 
             <!-- Heatmap / Zone Occupancy -->
-            <div class="glass-panel">
+            <div class="glass-panel" onclick="openHeatmapModal()" style="cursor: pointer;">
                 <div class="panel-header">
                     <div class="panel-title">
                         <i data-lucide="layout" style="color: #f59e0b; width: 18px; height: 18px;"></i>
@@ -1177,7 +1312,7 @@
                     </div>
                 </div>
                 <div class="panel-body">
-                    <div class="zone-grid" id="zone-grid">
+                    <div class="zone-grid" id="zone-grid" onclick="event.stopPropagation()">
                         <div class="no-anomalies">Loading zone metrics...</div>
                     </div>
                 </div>
@@ -1187,7 +1322,7 @@
         <!-- Bottom Grid: Anomalies + Details -->
         <div class="bottom-grid">
             <!-- Live Anomalies Feed -->
-            <div class="glass-panel">
+            <div class="glass-panel" onclick="openAnomaliesModal()" style="cursor: pointer;">
                 <div class="panel-header">
                     <div class="panel-title">
                         <i data-lucide="bell-ring" style="color: var(--danger); width: 18px; height: 18px;"></i>
@@ -1195,7 +1330,7 @@
                     </div>
                 </div>
                 <div class="panel-body">
-                    <div class="anomalies-list" id="anomalies-list">
+                    <div class="anomalies-list" id="anomalies-list" onclick="event.stopPropagation()">
                         <div class="no-anomalies">
                             <i data-lucide="shield-check" style="width: 32px; height: 32px; color: var(--success); opacity: 0.6;"></i>
                             <p>No active anomalies or warnings detected in this store layout.</p>
@@ -1205,14 +1340,14 @@
             </div>
 
             <!-- API Status / Details -->
-            <div class="glass-panel">
+            <div class="glass-panel" onclick="openSystemHealthModal()" style="cursor: pointer;">
                 <div class="panel-header">
                     <div class="panel-title">
                         <i data-lucide="activity" style="color: var(--success); width: 18px; height: 18px;"></i>
                         <span>System Health & Node Status</span>
                     </div>
                 </div>
-                <div class="panel-body api-info-panel">
+                <div class="panel-body api-info-panel" onclick="event.stopPropagation()">
                     <div class="api-stat-row">
                         <span class="api-stat-label"><i data-lucide="database" style="width: 14px;"></i> SQLite DB Link</span>
                         <span class="api-stat-val text-success" id="health-db">Connected</span>
@@ -1239,7 +1374,7 @@
             </div>
 
             <!-- Cloud Synchronization Hub (Central GCP BigQuery Node) -->
-            <div class="glass-panel" style="margin-top: 1.5rem;">
+            <div class="glass-panel" onclick="openCloudSyncModal()" style="margin-top: 1.5rem; cursor: pointer;">
                 <div class="panel-header">
                     <div class="panel-title">
                         <i data-lucide="cloud-lightning" style="color: #00b0ff; width: 18px; height: 18px;"></i>
@@ -1296,10 +1431,168 @@
         let countdown = 5;
         let refreshTimerInterval = null;
 
+        // --- Dynamic Face Database and Inspector Logics ---
+        const faceDatabase = {
+            'VIS_custA01': {
+                name: 'VIS_custA01',
+                role: 'CUSTOMER',
+                img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=150&h=150&q=80',
+                path: 'ENTRY ➔ SKINCARE ➔ BILLING',
+                match: '98%',
+                embedding: [0.34, 0.61, 0.08, 0.92, 0.54, 0.21, 0.77, 0.43]
+            },
+            'VIS_custB02': {
+                name: 'VIS_custB02',
+                role: 'CUSTOMER',
+                img: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?fit=crop&w=150&h=150&q=80',
+                path: 'ENTRY ➔ HAIRCARE ➔ EXIT',
+                match: '94%',
+                embedding: [0.12, 0.85, 0.45, 0.22, 0.67, 0.39, 0.15, 0.89]
+            },
+            'VIS_custC02': {
+                name: 'VIS_custC02',
+                role: 'CUSTOMER',
+                img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?fit=crop&w=150&h=150&q=80',
+                path: 'ENTRY ➔ HAIRCARE ➔ BILLING',
+                match: '95%',
+                embedding: [0.55, 0.12, 0.73, 0.84, 0.33, 0.62, 0.18, 0.91]
+            },
+            'VIS_custD03': {
+                name: 'VIS_custD03',
+                role: 'CUSTOMER',
+                img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?fit=crop&w=150&h=150&q=80',
+                path: 'ENTRY ➔ SKINCARE ➔ EXIT',
+                match: '96%',
+                embedding: [0.22, 0.71, 0.45, 0.12, 0.94, 0.36, 0.52, 0.78]
+            },
+            'VIS_staff01': {
+                name: 'VIS_staff01',
+                role: 'STAFF',
+                img: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?fit=crop&w=150&h=150&q=80',
+                path: 'MAIN_FLOOR (EXCLUDED FROM KPIs)',
+                match: '99%',
+                embedding: [0.89, 0.95, 0.12, 0.05, 0.44, 0.83, 0.21, 0.15]
+            }
+        };
+
+        function updateFaceSidebar() {
+            const sidebar = document.getElementById('cv-face-sidebar');
+            if (!sidebar) return;
+            
+            let html = '';
+            let cameraVisitors = [];
+            
+            if (activeCamera === 'ENTRY') {
+                cameraVisitors = ['VIS_custA01', 'VIS_custB02', 'VIS_staff01'];
+            } else if (activeCamera === 'MAIN') {
+                cameraVisitors = ['VIS_custA01', 'VIS_custC02'];
+            } else if (activeCamera === 'BILL') {
+                cameraVisitors = ['VIS_custA01', 'VIS_custC02', 'VIS_custD03'];
+            }
+            
+            cameraVisitors.forEach(vid => {
+                const f = faceDatabase[vid];
+                if (f) {
+                    html += `
+                        <div class="cv-face-card" onclick="openFaceEmbeddingModal('${vid}'); event.stopPropagation();">
+                            <img src="${f.img}" class="cv-face-avatar">
+                            <div class="cv-face-info">
+                                <span class="cv-face-id">${f.name}</span>
+                                <span class="cv-face-match">${f.match} match</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            sidebar.innerHTML = html;
+        }
+
+        function openFaceEmbeddingModal(vid) {
+            const modal = document.getElementById('module-modal');
+            const titleText = document.getElementById('modal-title-text');
+            const bodyContent = document.getElementById('modal-body-content');
+            const f = faceDatabase[vid];
+            if (!f) return;
+            
+            modal.classList.add('show');
+            titleText.textContent = `Visitor Neural Embedding Profile - ${vid}`;
+            
+            let vectorHtml = '';
+            f.embedding.forEach(val => {
+                vectorHtml += `<div class="vector-element" style="background: rgba(0, 255, 102, ${val})">${val}</div>`;
+            });
+            
+            bodyContent.innerHTML = `
+                <div style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 1.5rem;">
+                    <img src="${f.img}" style="width: 120px; height: 120px; border-radius: 12px; border: 2px solid var(--primary); object-fit: cover;">
+                    <div style="flex: 1;">
+                        <h4 style="margin: 0 0 8px 0; color: #fff;">Visitor ID: ${f.name}</h4>
+                        <div style="margin-bottom: 6px;"><strong>Role:</strong> <span class="${f.role === 'STAFF' ? 'badge-staff' : 'badge-cust'}">${f.role}</span></div>
+                        <div style="margin-bottom: 6px;"><strong>Re-ID Bounding Box Confidence:</strong> <span style="color: #00ff66; font-weight:bold;">${f.match} Match</span></div>
+                        <div><strong>Active Trajectory Path:</strong> <span style="font-family: monospace; font-size: 0.8rem; color: var(--secondary);">${f.path}</span></div>
+                    </div>
+                </div>
+                <strong>128-d Attire Signature Embedding Vector (First 8 elements shown):</strong>
+                <div class="vector-grid-box">
+                    ${vectorHtml}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); background: rgba(108, 92, 231, 0.05); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(108, 92, 231, 0.15); line-height: 1.4;">
+                    <strong>Tracking Engine Note:</strong> Attire neural vectors are extracted from clothing colors and shapes to enable cross-camera Re-ID tracking across blind spots.
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
         // --- Visualizer & CCTV / Floor Plan Animation variables ---
         let activeCamera = 'ENTRY';
         let cvCanvas, cvCtx;
         let visualizerVisitors = [];
+        
+        // --- Real-world CCTV Video Feeds Configuration ---
+        const videoFeeds = {
+            'ENTRY': 'https://assets.mixkit.co/videos/preview/mixkit-people-shopping-in-a-supermarket-40841-large.mp4',
+            'MAIN': 'https://assets.mixkit.co/videos/preview/mixkit-buyer-choosing-cosmetics-in-beauty-store-40854-large.mp4',
+            'BILL': 'https://assets.mixkit.co/videos/preview/mixkit-paying-at-the-cashier-in-a-supermarket-40843-large.mp4'
+        };
+        let activeVideoElement = null;
+        let loadedVideos = {};
+
+        // Unified persistent global store roster to prevent dots disappearing
+        let allStoreShoppers = [
+            { id: 'VIS_custA01', is_staff: false, conf: 0.96, color: '#00ff66', current_zone: 'SKINCARE', path: ['ENTRY', 'SKINCARE'], x: 500, y: 110, dx: 0.6, dy: -0.4, w: 45, h: 90, zoneTimer: 300, face: '/assets/shopper1.png', mapX: 75, mapY: 25 },
+            { id: 'VIS_custB02', is_staff: false, conf: 0.94, color: '#a8a5e6', current_zone: 'HAIRCARE', path: ['ENTRY', 'HAIRCARE'], x: 480, y: 220, dx: -0.5, dy: 0.6, w: 45, h: 90, zoneTimer: 450, face: '/assets/shopper2.png', mapX: 75, mapY: 75 },
+            { id: 'VIS_custC02', is_staff: false, conf: 0.95, color: '#f59e0b', current_zone: 'BILLING', path: ['ENTRY', 'HAIRCARE', 'BILLING'], x: 220, y: 170, dx: 0, dy: 0, w: 48, h: 95, queue_idx: 1, face: '/assets/shopper3.png', mapX: 25, mapY: 75 },
+            { id: 'VIS_custD03', is_staff: false, conf: 0.97, color: '#f59e0b', current_zone: 'BILLING', path: ['ENTRY', 'SKINCARE', 'BILLING'], x: 150, y: 170, dx: 0, dy: 0, w: 48, h: 95, queue_idx: 0, face: '/assets/shopper1.png', mapX: 25, mapY: 75 },
+            { id: 'VIS_staff01', is_staff: true, conf: 0.99, color: '#ff00ff', current_zone: 'SKINCARE', path: ['ENTRY', 'SKINCARE'], x: 320, y: 130, dx: 0.4, dy: 0.4, w: 45, h: 90, face: '/assets/staff1.png', mapX: 45, mapY: 40 }
+        ];
+
+        let visitorPathHistories = {
+            'VIS_custA01': ['ENTRY', 'SKINCARE'],
+            'VIS_custB02': ['ENTRY', 'HAIRCARE'],
+            'VIS_custC02': ['ENTRY', 'HAIRCARE', 'BILLING'],
+            'VIS_custD03': ['ENTRY', 'SKINCARE', 'BILLING'],
+            'VIS_staff01': ['ENTRY', 'SKINCARE']
+        };
+
+        function getOrCreateVideo(camType) {
+            if (loadedVideos[camType]) {
+                return loadedVideos[camType];
+            }
+            const video = document.createElement('video');
+            video.src = videoFeeds[camType];
+            video.loop = true;
+            video.muted = true;
+            video.playsInline = true;
+            video.autoplay = true;
+            video.crossOrigin = 'anonymous';
+            video.style.display = 'none';
+            document.body.appendChild(video);
+            
+            video.play().catch(e => console.log('Video play error:', e));
+            loadedVideos[camType] = video;
+            return video;
+        }
         
         function initCVVisualizer() {
             cvCanvas = document.getElementById('cvCanvas');
@@ -1314,8 +1607,37 @@
             resizeCanvas();
             window.addEventListener('resize', resizeCanvas);
             
-            // Seed initial visualizer visitors
-            generateVisualizerVisitors();
+            // Initiate entry video
+            activeVideoElement = getOrCreateVideo('ENTRY');
+            
+            // Add click listener on CCTV Canvas for Interactive Bounding Box Tracking
+            cvCanvas.style.cursor = 'crosshair';
+            cvCanvas.addEventListener('click', function(e) {
+                const rect = cvCanvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+                
+                // Scale coordinate parameters to Canvas dimensions
+                const canvasX = (clickX / rect.width) * cvCanvas.width;
+                const canvasY = (clickY / rect.height) * cvCanvas.height;
+                
+                // Find visible visitors matching coordinate boundaries
+                const activeVisitors = allStoreShoppers.filter(s => {
+                    if (activeCamera === 'ENTRY') return s.current_zone === 'ENTRY';
+                    if (activeCamera === 'MAIN') return s.current_zone === 'SKINCARE' || s.current_zone === 'HAIRCARE';
+                    if (activeCamera === 'BILL') return s.current_zone === 'BILLING';
+                    return false;
+                });
+                
+                const clicked = activeVisitors.find(v => 
+                    canvasX >= v.x && canvasX <= (v.x + v.w) &&
+                    canvasY >= v.y && canvasY <= (v.y + v.h)
+                );
+                
+                if (clicked) {
+                    trackVisitor(clicked.id);
+                }
+            });
             
             // Start visualizer animation loop
             requestAnimationFrame(cvAnimationLoop);
@@ -1338,67 +1660,168 @@
                 document.getElementById('cv-cam-name').textContent = 'CAM_BILL_02';
             }
             
-            generateVisualizerVisitors();
+            // Pause previous video and play selected feed
+            if (activeVideoElement) {
+                activeVideoElement.pause();
+            }
+            activeVideoElement = getOrCreateVideo(camType);
+            activeVideoElement.play().catch(e => console.log('Video play error:', e));
+            
+            // Update the floating face Re-ID cards
+            updateFaceSidebar();
+            
             showToast(`Switched CCTV angle to ${camType}`);
         }
 
-        function generateVisualizerVisitors() {
-            visualizerVisitors = [];
-            const ids = ['VIS_custA01', 'VIS_custB02', 'VIS_custC02', 'VIS_custD03', 'VIS_staff01'];
+        let flashEntryTimer = 0;
+        let flashEntryText = "";
+
+        // Shopper coordinates and state machine updater running every frame
+        function updateShopperDetections() {
+            allStoreShoppers.forEach(s => {
+                if (s.is_staff) {
+                    // Staff wanders across skincare and haircare shelf areas forever
+                    s.x += s.dx;
+                    s.y += s.dy;
+                    let minX = 40, maxX = cvCanvas.width - 240;
+                    let minY = 40, maxY = cvCanvas.height - 40;
+                    if (s.x < minX || s.x > maxX) s.dx *= -1;
+                    if (s.y < minY || s.y > maxY) s.dy *= -1;
+                    
+                    if (Math.random() < 0.001) {
+                        s.current_zone = s.current_zone === 'SKINCARE' ? 'HAIRCARE' : 'SKINCARE';
+                    }
+                    return;
+                }
+                
+                // Customers State Machine transitions
+                if (s.current_zone === 'ENTRY') {
+                    s.y += s.dy;
+                    s.x += s.dx;
+                    
+                    if (s.x < 30 || s.x > cvCanvas.width - 90) s.dx *= -1;
+                    
+                    if (s.y + s.h/2 >= 220 && s.y + s.h/2 < 220 + s.dy) {
+                        flashEntryTimer = 60;
+                        flashEntryText = `EVENT EMITTED: ENTRY - ${s.id} [CONF: ${s.conf.toFixed(2)}]`;
+                    }
+                    
+                    if (s.y > cvCanvas.height) {
+                        const nextZone = Math.random() > 0.5 ? 'SKINCARE' : 'HAIRCARE';
+                        s.current_zone = nextZone;
+                        s.path.push(nextZone);
+                        visitorPathHistories[s.id] = [...s.path];
+                        
+                        s.x = 80 + Math.random() * 150;
+                        s.y = 80 + Math.random() * 150;
+                        s.dx = (Math.random() - 0.5) * 1.5;
+                        s.dy = (Math.random() - 0.5) * 1.5;
+                        s.zoneTimer = 500 + Math.floor(Math.random() * 400); // Dwell time
+                        
+                        showToast(`Visitor ${s.id} walked into ${nextZone} zone.`);
+                    }
+                } 
+                else if (s.current_zone === 'SKINCARE' || s.current_zone === 'HAIRCARE') {
+                    s.x += s.dx;
+                    s.y += s.dy;
+                    
+                    let minX = 40, maxX = cvCanvas.width - 40;
+                    let minY = 40, maxY = cvCanvas.height - 40;
+                    
+                    if (s.x < minX || s.x > maxX - s.w) s.dx *= -1;
+                    if (s.y < minY || s.y > maxY - s.h) s.dy *= -1;
+                    
+                    const midX = s.x + s.w/2;
+                    const midY = s.y + s.h/2;
+                    if (midX > cvCanvas.width - 180 && midY > 20 && midY < 160) {
+                        if (s.current_zone !== 'SKINCARE') {
+                            s.current_zone = 'SKINCARE';
+                            if (s.path[s.path.length-1] !== 'SKINCARE') {
+                                s.path.push('SKINCARE');
+                                visitorPathHistories[s.id] = [...s.path];
+                            }
+                        }
+                    } else if (midX > cvCanvas.width - 180 && midY > 200 && midY < 340) {
+                        if (s.current_zone !== 'HAIRCARE') {
+                            s.current_zone = 'HAIRCARE';
+                            if (s.path[s.path.length-1] !== 'HAIRCARE') {
+                                s.path.push('HAIRCARE');
+                                visitorPathHistories[s.id] = [...s.path];
+                            }
+                        }
+                    }
+                    
+                    s.zoneTimer--;
+                    if (s.zoneTimer <= 0) {
+                        s.current_zone = 'BILLING';
+                        s.path.push('BILLING');
+                        visitorPathHistories[s.id] = [...s.path];
+                        
+                        const billQueue = allStoreShoppers.filter(cust => cust.current_zone === 'BILLING' && !cust.is_staff);
+                        s.queue_idx = billQueue.length;
+                        
+                        s.x = cvCanvas.width + 50;
+                        s.y = 170;
+                        s.dx = 0;
+                        s.dy = 0;
+                        
+                        showToast(`Visitor ${s.id} entered the checkout queue.`);
+                    }
+                } 
+                else if (s.current_zone === 'BILLING') {
+                    const targetX = 90 + (s.queue_idx || 0) * 60;
+                    const targetY = 170 + Math.sin(Date.now() * 0.003 + (s.queue_idx || 0)) * 4;
+                    
+                    s.x += (targetX - s.x) * 0.08;
+                    s.y += (targetY - s.y) * 0.08;
+                }
+            });
             
-            if (activeCamera === 'ENTRY') {
-                for (let i = 0; i < 3; i++) {
-                    visualizerVisitors.push({
-                        id: ids[i],
-                        x: 50 + Math.random() * 200,
-                        y: 10 + Math.random() * 80,
-                        dx: (Math.random() - 0.5) * 0.4,
-                        dy: 1.0 + Math.random() * 1.5,
-                        w: 45,
-                        h: 90,
-                        is_staff: i === 4,
-                        conf: 0.92 + Math.random() * 0.07,
-                        color: i === 4 ? '#ff00ff' : '#00ff66',
-                        state: 'INBOUND'
-                    });
-                }
-            } else if (activeCamera === 'MAIN') {
-                for (let i = 0; i < 4; i++) {
-                    visualizerVisitors.push({
-                        id: ids[i],
-                        x: 80 + Math.random() * 200,
-                        y: 80 + Math.random() * 120,
-                        dx: (Math.random() - 0.5) * 1.2,
-                        dy: (Math.random() - 0.5) * 1.2,
-                        w: 50,
-                        h: 100,
-                        is_staff: i === 4,
-                        conf: 0.94 + Math.random() * 0.05,
-                        color: i === 4 ? '#ff00ff' : '#6c5ce7',
-                        current_zone: Math.random() > 0.5 ? 'SKINCARE' : 'HAIRCARE'
-                    });
-                }
-            } else if (activeCamera === 'BILL') {
-                for (let i = 0; i < 3; i++) {
-                    visualizerVisitors.push({
-                        id: ids[i],
-                        x: 100 + i * 65,
-                        y: 170,
-                        dx: 0,
-                        dy: 0,
-                        w: 48,
-                        h: 95,
-                        is_staff: false,
-                        conf: 0.96 + Math.random() * 0.03,
-                        color: '#f59e0b',
-                        queue_idx: i
+            // Random checkout completions matching POS triggers
+            if (Math.random() < 0.0012) {
+                const queueHead = allStoreShoppers.find(s => s.current_zone === 'BILLING' && s.queue_idx === 0 && !s.is_staff);
+                if (queueHead) {
+                    showToast(`POS SALES TXN: ${queueHead.id} completed checkout at Register #1!`);
+                    
+                    queueHead.queue_idx = -1;
+                    queueHead.current_zone = 'EXIT';
+                    
+                    setTimeout(() => {
+                        queueHead.current_zone = 'ENTRY';
+                        queueHead.path = ['ENTRY'];
+                        visitorPathHistories[queueHead.id] = ['ENTRY'];
+                        
+                        queueHead.x = 50 + Math.random() * 200;
+                        queueHead.y = -queueHead.h;
+                        queueHead.dx = (Math.random() - 0.5) * 0.4;
+                        queueHead.dy = 1.0 + Math.random() * 1.5;
+                        queueHead.conf = 0.92 + Math.random() * 0.07;
+                        
+                        showToast(`New shopper entered the store (re-identification matches ${queueHead.id}).`);
+                    }, 2500);
+                    
+                    allStoreShoppers.forEach(s => {
+                        if (s.current_zone === 'BILLING' && s.queue_idx > 0) {
+                            s.queue_idx--;
+                        }
                     });
                 }
             }
         }
 
-        let flashEntryTimer = 0;
-        let flashEntryText = "";
+        // Animate dots on floor plan
+        function animateStoreShoppers() {
+            allStoreShoppers.forEach(s => {
+                const center = zoneCenters[s.current_zone] || { x: 50, y: 50 };
+                const speedFactor = s.id === trackedVisitorId ? 0.001 : 0.0006;
+                const variance = s.id === trackedVisitorId ? 3.5 : 5.0; 
+                const seed = s.id.charCodeAt(5) * 10;
+                const angle = Date.now() * speedFactor + seed;
+                
+                s.mapX = center.x + Math.cos(angle) * variance;
+                s.mapY = center.y + Math.sin(angle * 1.3) * variance;
+            });
+        }
 
         function cvAnimationLoop() {
             if (!cvCtx || !cvCanvas) return;
@@ -1409,61 +1832,61 @@
             const tsEl = document.getElementById('cv-timestamp');
             if (tsEl) tsEl.textContent = timeStr;
             
-            // Clear frame
-            cvCtx.fillStyle = '#020308';
-            cvCtx.fillRect(0, 0, cvCanvas.width, cvCanvas.height);
+            // 1. Draw Real Stock Video Frames directly on Canvas!
+            if (activeVideoElement && activeVideoElement.readyState >= 2) {
+                cvCtx.drawImage(activeVideoElement, 0, 0, cvCanvas.width, cvCanvas.height);
+                cvCtx.fillStyle = 'rgba(2, 3, 8, 0.45)';
+                cvCtx.fillRect(0, 0, cvCanvas.width, cvCanvas.height);
+            } else {
+                cvCtx.fillStyle = '#020308';
+                cvCtx.fillRect(0, 0, cvCanvas.width, cvCanvas.height);
+                cvCtx.fillStyle = '#8a99ad';
+                cvCtx.font = '14px sans-serif';
+                cvCtx.fillText('Loading Camera Video Feed...', cvCanvas.width/2 - 100, cvCanvas.height/2);
+            }
             
-            // Draw grid mapping perspective
-            cvCtx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
+            // Draw grid perspective overlay
+            cvCtx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
             cvCtx.lineWidth = 1;
-            for (let x = 0; x < cvCanvas.width; x += 30) {
+            for (let x = 0; x < cvCanvas.width; x += 40) {
                 cvCtx.beginPath();
                 cvCtx.moveTo(x, 0);
-                cvCtx.lineTo(x + (x - cvCanvas.width/2)*0.2, cvCanvas.height);
+                cvCtx.lineTo(x + (x - cvCanvas.width/2)*0.15, cvCanvas.height);
                 cvCtx.stroke();
             }
-            for (let y = 0; y < cvCanvas.height; y += 30) {
+            for (let y = 0; y < cvCanvas.height; y += 40) {
                 cvCtx.beginPath();
                 cvCtx.moveTo(0, y);
                 cvCtx.lineTo(cvCanvas.width, y);
                 cvCtx.stroke();
             }
             
+            // Update Shopper Detections & State Machine simulation
+            updateShopperDetections();
+            
+            // Filter active visitors based on active camera
+            visualizerVisitors = allStoreShoppers.filter(s => {
+                if (activeCamera === 'ENTRY') {
+                    return s.current_zone === 'ENTRY';
+                } else if (activeCamera === 'MAIN') {
+                    return s.current_zone === 'SKINCARE' || s.current_zone === 'HAIRCARE';
+                } else if (activeCamera === 'BILL') {
+                    return s.current_zone === 'BILLING';
+                }
+                return false;
+            });
+            
             // Render specific layouts based on active camera angle
             if (activeCamera === 'ENTRY') {
-                // Draw perspective walls and entry corridor
-                cvCtx.fillStyle = 'rgba(255,255,255,0.01)';
-                cvCtx.beginPath();
-                cvCtx.moveTo(0, 0);
-                cvCtx.lineTo(60, 0);
-                cvCtx.lineTo(60, cvCanvas.height);
-                cvCtx.lineTo(0, cvCanvas.height);
-                cvCtx.fill();
-
-                // Draw automated sliding glass doors
-                cvCtx.strokeStyle = 'rgba(108, 92, 231, 0.4)';
-                cvCtx.lineWidth = 4;
-                cvCtx.strokeRect(60, 30, 110, 130);
-                cvCtx.fillStyle = 'rgba(108, 92, 231, 0.08)';
-                cvCtx.fillRect(60, 30, 110, 130);
-                
-                // Glass doors visual shine lines
-                cvCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-                cvCtx.lineWidth = 1;
-                cvCtx.beginPath();
-                cvCtx.moveTo(70, 150);
-                cvCtx.lineTo(150, 40);
-                cvCtx.stroke();
-
                 // Entry Threshold Boundary
-                cvCtx.strokeStyle = 'rgba(255, 59, 48, 0.4)';
+                cvCtx.strokeStyle = 'rgba(255, 59, 48, 0.5)';
                 cvCtx.lineWidth = 3;
                 cvCtx.beginPath();
                 cvCtx.moveTo(0, 220);
                 cvCtx.lineTo(cvCanvas.width, 220);
                 cvCtx.stroke();
                 
-                cvCtx.fillStyle = 'rgba(255, 59, 48, 0.8)';
+                cvCtx.fillStyle = 'rgba(255, 59, 48, 0.9)';
                 cvCtx.font = 'bold 10px monospace';
                 cvCtx.fillText('ENTRY THRESHOLD GATEWAY', 15, 212);
                 
@@ -1477,31 +1900,12 @@
                 cvCtx.setLineDash([]);
                 
                 visualizerVisitors.forEach(v => {
-                    v.y += v.dy;
-                    v.x += v.dx;
-                    
-                    if (v.x < 20 || v.x > cvCanvas.width - 60) v.dx *= -1;
-                    
-                    if (v.y > cvCanvas.height) {
-                        v.y = -v.h;
-                        v.x = 50 + Math.random() * (cvCanvas.width - 120);
-                        v.dy = 1.0 + Math.random() * 1.5;
-                        v.conf = 0.91 + Math.random() * 0.08;
-                    }
-                    
-                    if (v.y + v.h/2 >= 220 && v.y + v.h/2 < 220 + v.dy) {
-                        flashEntryTimer = 60;
-                        flashEntryText = `EVENT EMITTED: ENTRY - ${v.id} [CONF: ${v.conf.toFixed(2)}]`;
-                        cvCtx.fillStyle = 'rgba(0, 255, 102, 0.3)';
-                        cvCtx.fillRect(0, 210, cvCanvas.width, 20);
-                    }
-                    
                     drawObjectBox(v);
                 });
             } else if (activeCamera === 'MAIN') {
                 // Draw Skincare Zone bounds and visual shelves
-                cvCtx.strokeStyle = 'rgba(108, 92, 231, 0.3)';
-                cvCtx.fillStyle = 'rgba(108, 92, 231, 0.03)';
+                cvCtx.strokeStyle = 'rgba(108, 92, 231, 0.4)';
+                cvCtx.fillStyle = 'rgba(108, 92, 231, 0.05)';
                 cvCtx.lineWidth = 2;
                 cvCtx.fillRect(cvCanvas.width - 180, 20, 160, 140);
                 cvCtx.strokeRect(cvCanvas.width - 180, 20, 160, 140);
@@ -1509,8 +1913,8 @@
                 // Render Skincare category shelf layout bottles
                 cvCtx.fillStyle = '#6c5ce7';
                 for (let sx = cvCanvas.width - 165; sx < cvCanvas.width - 30; sx += 24) {
-                    cvCtx.fillRect(sx, 48, 12, 22); // Moisturizer creams
-                    cvCtx.fillRect(sx, 105, 14, 25); // serums
+                    cvCtx.fillRect(sx, 48, 12, 22);
+                    cvCtx.fillRect(sx, 105, 14, 25);
                 }
                 
                 cvCtx.fillStyle = '#6c5ce7';
@@ -1518,47 +1922,27 @@
                 cvCtx.fillText('ZONE: SKINCARE SHELF [CAM_MAIN]', cvCanvas.width - 170, 35);
                 
                 // Draw Haircare Zone bounds and visual shelves
-                cvCtx.strokeStyle = 'rgba(168, 165, 230, 0.3)';
-                cvCtx.fillStyle = 'rgba(168, 165, 230, 0.03)';
+                cvCtx.strokeStyle = 'rgba(168, 165, 230, 0.4)';
+                cvCtx.fillStyle = 'rgba(168, 165, 230, 0.05)';
                 cvCtx.fillRect(cvCanvas.width - 180, 200, 160, 140);
                 cvCtx.strokeRect(cvCanvas.width - 180, 200, 160, 140);
                 
                 // Render Haircare category shelf layout shampoos
                 cvCtx.fillStyle = '#a8a5e6';
                 for (let hx = cvCanvas.width - 165; hx < cvCanvas.width - 30; hx += 24) {
-                    cvCtx.fillRect(hx, 225, 14, 28); // shampoo bottles
-                    cvCtx.fillRect(hx, 285, 10, 22); // hair oils
+                    cvCtx.fillRect(hx, 225, 14, 28);
+                    cvCtx.fillRect(hx, 285, 10, 22);
                 }
                 
                 cvCtx.fillStyle = '#a8a5e6';
                 cvCtx.fillText('ZONE: HAIRCARE SHELF [CAM_MAIN]', cvCanvas.width - 170, 215);
                 
                 visualizerVisitors.forEach(v => {
-                    v.x += v.dx;
-                    v.y += v.dy;
-                    
-                    if (v.x < 30 || v.x > cvCanvas.width - v.w - 30) v.dx *= -1;
-                    if (v.y < 30 || v.y > cvCanvas.height - v.h - 30) v.dy *= -1;
-                    
-                    const midX = v.x + v.w/2;
-                    const midY = v.y + v.h/2;
-                    
-                    if (midX > cvCanvas.width - 180 && midY > 20 && midY < 160) {
-                        v.color = '#6c5ce7';
-                        v.current_zone = 'SKINCARE';
-                    } else if (midX > cvCanvas.width - 180 && midY > 200 && midY < 340) {
-                        v.color = '#a8a5e6';
-                        v.current_zone = 'HAIRCARE';
-                    } else {
-                        v.color = '#00ff66';
-                        v.current_zone = null;
-                    }
-                    
                     drawObjectBox(v);
                 });
             } else if (activeCamera === 'BILL') {
                 // Draw Billing Counter desk
-                cvCtx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+                cvCtx.fillStyle = 'rgba(16, 185, 129, 0.18)';
                 cvCtx.strokeStyle = '#10b981';
                 cvCtx.lineWidth = 2;
                 cvCtx.fillRect(20, 120, 50, 180);
@@ -1566,13 +1950,13 @@
                 
                 // Cash register terminal monitor drawing
                 cvCtx.fillStyle = '#020308';
-                cvCtx.fillRect(25, 145, 24, 18); // register screen
+                cvCtx.fillRect(25, 145, 24, 18);
                 cvCtx.strokeStyle = '#10b981';
                 cvCtx.lineWidth = 1;
                 cvCtx.strokeRect(25, 145, 24, 18);
                 cvCtx.fillStyle = '#10b981';
-                cvCtx.fillRect(33, 163, 8, 12); // stand
-                cvCtx.fillRect(22, 175, 30, 4); // keyboard base
+                cvCtx.fillRect(33, 163, 8, 12);
+                cvCtx.fillRect(22, 175, 30, 4);
                 
                 cvCtx.fillStyle = '#10b981';
                 cvCtx.font = 'bold 9px monospace';
@@ -1582,7 +1966,7 @@
                 cvCtx.fillText('BILLING ASSOCIATE COUNTER', 0, 0);
                 cvCtx.restore();
                 
-                cvCtx.strokeStyle = 'rgba(245, 158, 11, 0.2)';
+                cvCtx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
                 cvCtx.setLineDash([3, 3]);
                 cvCtx.beginPath();
                 cvCtx.moveTo(70, 210);
@@ -1593,43 +1977,14 @@
                 cvCtx.fillStyle = '#f59e0b';
                 cvCtx.fillText(`LIVE QUEUE DEPTH: ${visualizerVisitors.length}`, 80, 140);
                 
-                visualizerVisitors.forEach((v, index) => {
-                    const targetX = 90 + index * 60;
-                    const targetY = 170 + Math.sin(Date.now()*0.003 + index)*4;
-                    
-                    v.x += (targetX - v.x) * 0.08;
-                    v.y += (targetY - v.y) * 0.08;
-                    
-                    v.color = '#f59e0b';
+                visualizerVisitors.forEach(v => {
                     drawObjectBox(v);
                 });
-                
-                if (Math.random() < 0.003 && visualizerVisitors.length > 0) {
-                    const checkedOut = visualizerVisitors.shift();
-                    showToast(`POS SALES TXN: ${checkedOut.id} completed billing checkout!`);
-                    
-                    setTimeout(() => {
-                        if (activeCamera === 'BILL' && visualizerVisitors.length < 5) {
-                            visualizerVisitors.push({
-                                id: 'VIS_cust' + String.fromCharCode(65 + Math.floor(Math.random()*4)) + '0' + (Math.floor(Math.random()*4)+1),
-                                x: cvCanvas.width + 50,
-                                y: 170,
-                                dx: 0,
-                                dy: 0,
-                                w: 48,
-                                h: 95,
-                                is_staff: false,
-                                conf: 0.95 + Math.random()*0.04,
-                                color: '#f59e0b'
-                            });
-                        }
-                    }, 2000);
-                }
             }
             
             if (flashEntryTimer > 0) {
                 flashEntryTimer--;
-                cvCtx.fillStyle = 'rgba(0, 255, 102, 0.85)';
+                cvCtx.fillStyle = 'rgba(0, 255, 102, 0.9)';
                 cvCtx.fillRect(15, 50, cvCanvas.width - 30, 28);
                 
                 cvCtx.fillStyle = '#080a10';
@@ -1637,7 +1992,7 @@
                 cvCtx.fillText(flashEntryText, 25, 68);
             }
             
-            cvCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+            cvCtx.fillStyle = 'rgba(255, 255, 255, 0.04)';
             cvCtx.fillRect(0, cvCanvas.height - 30, cvCanvas.width, 30);
             
             cvCtx.fillStyle = '#8a99ad';
@@ -1651,23 +2006,89 @@
 
         function drawObjectBox(v) {
             cvCtx.strokeStyle = v.color;
-            cvCtx.lineWidth = 2;
+            cvCtx.lineWidth = 2.5;
             cvCtx.strokeRect(v.x, v.y, v.w, v.h);
             
-            cvCtx.fillStyle = v.color + '1a';
+            cvCtx.fillStyle = v.color + '22';
             cvCtx.fillRect(v.x, v.y, v.w, v.h);
             
             cvCtx.fillStyle = v.color;
             cvCtx.fillRect(v.x - 1, v.y - 15, v.w + 2, 16);
             
             cvCtx.fillStyle = '#080a10';
-            cvCtx.font = 'bold 9px monospace';
+            cvCtx.font = 'bold 9.5px monospace';
             cvCtx.fillText(`${v.id} (${Math.round(v.conf*100)}%)`, v.x + 3, v.y - 4);
             
             cvCtx.fillStyle = v.color;
             cvCtx.beginPath();
             cvCtx.arc(v.x + v.w/2, v.y + v.h, 4, 0, Math.PI*2);
             cvCtx.fill();
+        }
+
+        // --- Live Trajectory Tracking Variables & Helpers ---
+        let trackedVisitorId = null;
+        const zoneCenters = {
+            'ENTRY': { x: 20, y: 15 },
+            'SKINCARE': { x: 75, y: 25 },
+            'HAIRCARE': { x: 75, y: 75 },
+            'BILLING': { x: 25, y: 75 }
+        };
+
+        function trackVisitor(visitorId) {
+            trackedVisitorId = visitorId;
+            closeModal();
+            const indicator = document.getElementById('active-track-indicator');
+            if (indicator) {
+                indicator.style.display = 'inline-block';
+                document.getElementById('tracked-visitor-name').textContent = visitorId;
+            }
+            showToast(`Now tracking ${visitorId}'s live store trajectory.`);
+            updateInteractiveFloorMap();
+        }
+
+        function clearTracking() {
+            trackedVisitorId = null;
+            const svg = document.getElementById('floor-path-svg');
+            if (svg) svg.remove();
+            const indicator = document.getElementById('active-track-indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+            showToast('Live tracking cleared.');
+            updateInteractiveFloorMap();
+        }
+
+        function drawTrackedPath(visitorId, currentPctX, currentPctY) {
+            const mapContainer = document.getElementById('floor-map');
+            if (!mapContainer) return;
+            const width = mapContainer.clientWidth;
+            const height = mapContainer.clientHeight;
+
+            const history = visitorPathHistories[visitorId] || ['ENTRY'];
+            let pathPoints = [];
+
+            history.forEach(zone => {
+                const center = zoneCenters[zone];
+                if (center) {
+                    pathPoints.push(`${(center.x / 100) * width},${(center.y / 100) * height}`);
+                }
+            });
+
+            // Append current real-time dot coordinates
+            if (currentPctX !== undefined && currentPctY !== undefined) {
+                pathPoints.push(`${(currentPctX / 100) * width},${(currentPctY / 100) * height}`);
+            }
+
+            let svg = document.getElementById('floor-path-svg');
+            if (!svg) {
+                svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.id = 'floor-path-svg';
+                svg.setAttribute('class', 'floor-path-svg');
+                mapContainer.appendChild(svg);
+            }
+            svg.innerHTML = `
+                <polyline class="floor-path-line" points="${pathPoints.join(' ')}" />
+            `;
         }
 
         function updateInteractiveFloorMap() {
@@ -1685,33 +2106,53 @@
             if (hairdex) hairdex.classList.remove('active');
             if (billingdex) billingdex.classList.remove('active');
             
-            visualizerVisitors.forEach(v => {
+            let trackedVisitorPctX = undefined;
+            let trackedVisitorPctY = undefined;
+
+            // Update positions dynamically
+            animateStoreShoppers();
+
+            allStoreShoppers.forEach(v => {
+                let isTracked = (v.id === trackedVisitorId);
                 const dot = document.createElement('div');
-                dot.className = `visitor-dot ${v.is_staff ? 'staff' : ''}`;
+                dot.className = `visitor-dot ${v.is_staff ? 'staff' : ''} ${isTracked ? 'tracked' : ''}`;
                 dot.setAttribute('data-id', v.id);
                 
-                let pctX = 50;
-                let pctY = 50;
+                dot.style.cursor = 'pointer';
+                dot.onclick = (e) => {
+                    e.stopPropagation();
+                    trackVisitor(v.id);
+                };
                 
-                if (activeCamera === 'ENTRY') {
-                    pctX = 10 + (v.x / cvCanvas.width) * 20;
-                    pctY = 10 + (v.y / cvCanvas.height) * 40;
-                } else if (activeCamera === 'MAIN') {
-                    pctX = 35 + (v.x / cvCanvas.width) * 55;
-                    pctY = 10 + (v.y / cvCanvas.height) * 80;
-                    
-                    if (v.current_zone === 'SKINCARE' && skindex) skindex.classList.add('active');
-                    if (v.current_zone === 'HAIRCARE' && hairdex) hairdex.classList.add('active');
-                } else if (activeCamera === 'BILL') {
-                    pctX = 15 + (v.x / cvCanvas.width) * 40;
-                    pctY = 50 + (v.y / cvCanvas.height) * 40;
-                    if (billingdex) billingdex.classList.add('active');
-                }
+                dot.title = `${v.id} (${v.is_staff ? 'Staff' : 'Customer'}) - Zone: ${v.current_zone}`;
+                
+                let pctX = v.mapX;
+                let pctY = v.mapY;
+                
+                pctX = Math.max(5, Math.min(95, pctX));
+                pctY = Math.max(5, Math.min(95, pctY));
                 
                 dot.style.left = `${pctX}%`;
                 dot.style.top = `${pctY}%`;
                 mapContainer.appendChild(dot);
+
+                if (v.current_zone === 'SKINCARE' && skindex) skindex.classList.add('active');
+                if (v.current_zone === 'HAIRCARE' && hairdex) hairdex.classList.add('active');
+                if (v.current_zone === 'BILLING' && billingdex) billingdex.classList.add('active');
+
+                if (isTracked) {
+                    trackedVisitorPctX = pctX;
+                    trackedVisitorPctY = pctY;
+                }
             });
+
+            // Draw SVG path if a visitor is tracked
+            if (trackedVisitorId) {
+                drawTrackedPath(trackedVisitorId, trackedVisitorPctX, trackedVisitorPctY);
+            } else {
+                const svg = document.getElementById('floor-path-svg');
+                if (svg) svg.remove();
+            }
         }
 
         // Start polling on load
@@ -1719,6 +2160,10 @@
             fetchData();
             startCountdownTimer();
             initCVVisualizer();
+            // Default select entry camera and update sidebar
+            setTimeout(() => {
+                switchCamera('ENTRY');
+            }, 100);
         });
 
         function startCountdownTimer() {
@@ -2048,7 +2493,7 @@
             modal.classList.add('show');
             
             if (kpiType === 'visitors') {
-                titleText.textContent = "Live Edge AI Visitor Ledger (Cross-Camera Correlated)";
+                titleText.innerHTML = `<i data-lucide="users" style="color: var(--primary); width: 20px; height: 20px;"></i> Live Edge AI Visitor Ledger`;
                 bodyContent.innerHTML = `
                     <div style="margin-bottom: 1rem;">
                         <strong>Centralized Store Roster</strong>: YOLOv8 feeds detect human coordinates, correlate tracking vectors, and classify staff vs customers dynamically.
@@ -2056,41 +2501,51 @@
                     <table class="ledger-table">
                         <thead>
                             <tr>
+                                <th>FACE</th>
                                 <th>VISITOR ID</th>
                                 <th>ROLE</th>
                                 <th>CONF</th>
                                 <th>LAST SEEN CAMERA</th>
                                 <th>ACTIVE PATH</th>
+                                <th>ACTION</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
+                                <td><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=80&h=80&q=80" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--primary);"></td>
                                 <td>VIS_custA01</td>
                                 <td><span class="badge-cust">CUSTOMER</span></td>
                                 <td>96%</td>
                                 <td>CAM_MAIN_02</td>
                                 <td>ENTRY ➔ SKINCARE ➔ BILLING</td>
+                                <td><button onclick="trackVisitor('VIS_custA01')" style="background: var(--primary); border:none; color:#fff; font-size:0.7rem; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">TRACK LIVE</button></td>
                             </tr>
                             <tr>
+                                <td><img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?fit=crop&w=80&h=80&q=80" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--primary);"></td>
                                 <td>VIS_custB02</td>
                                 <td><span class="badge-cust">CUSTOMER</span></td>
                                 <td>94%</td>
                                 <td>CAM_MAIN_02</td>
                                 <td>ENTRY ➔ HAIRCARE ➔ EXIT</td>
+                                <td><button onclick="trackVisitor('VIS_custB02')" style="background: var(--primary); border:none; color:#fff; font-size:0.7rem; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">TRACK LIVE</button></td>
                             </tr>
                             <tr>
+                                <td><img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?fit=crop&w=80&h=80&q=80" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--primary);"></td>
                                 <td>VIS_custC02</td>
                                 <td><span class="badge-cust">CUSTOMER</span></td>
                                 <td>95%</td>
                                 <td>CAM_BILL_02</td>
                                 <td>ENTRY ➔ HAIRCARE ➔ BILLING</td>
+                                <td><button onclick="trackVisitor('VIS_custC02')" style="background: var(--primary); border:none; color:#fff; font-size:0.7rem; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">TRACK LIVE</button></td>
                             </tr>
                             <tr>
+                                <td><img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?fit=crop&w=80&h=80&q=80" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 1.5px solid #ff00ff;"></td>
                                 <td>VIS_staff01</td>
                                 <td><span class="badge-staff">STAFF</span></td>
                                 <td>99%</td>
                                 <td>CAM_ENTRY_02</td>
                                 <td>MAIN_FLOOR (EXCLUDED FROM KPIs)</td>
+                                <td><button onclick="trackVisitor('VIS_staff01')" style="background: #ff00ff; border:none; color:#fff; font-size:0.7rem; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">TRACK LIVE</button></td>
                             </tr>
                         </tbody>
                     </table>
@@ -2110,7 +2565,7 @@
                     </div>
                 `;
             } else if (kpiType === 'conversion') {
-                titleText.textContent = "POS Transaction Time-Correlation Ledger";
+                titleText.innerHTML = `<i data-lucide="shopping-bag" style="color: var(--success); width: 20px; height: 20px;"></i> POS Transaction Correlation`;
                 bodyContent.innerHTML = `
                     <div style="margin-bottom: 1rem;">
                         <strong>Time-Window POS Attribution Audit</strong>: POS transactions are linked to visitor tracking sessions by matching store IDs and billing entry timestamps within a 5-minute threshold.
@@ -2154,7 +2609,7 @@
                     </div>
                 `;
             } else if (kpiType === 'dwell') {
-                titleText.textContent = "Zone Attention Breakdown";
+                titleText.innerHTML = `<i data-lucide="clock" style="color: #f59e0b; width: 20px; height: 20px;"></i> Zone Attention Breakdown`;
                 bodyContent.innerHTML = `
                     <div style="margin-bottom: 1rem;">
                         <strong>Store Section Engagement Index</strong>: Highlights which product categories draw customer attention but fail to convert.
@@ -2190,7 +2645,7 @@
                     </div>
                 `;
             } else if (kpiType === 'queue') {
-                titleText.textContent = "Checkout Queue & Cashier Dispatcher";
+                titleText.innerHTML = `<i data-lucide="hourglass" style="color: var(--danger); width: 20px; height: 20px;"></i> Checkout Queue Management`;
                 bodyContent.innerHTML = `
                     <div style="margin-bottom: 1rem;">
                         <strong>Checkout Terminal Allocator</strong>: Real-time billing queue monitoring automatically signals if cashier bottlenecks build up.
@@ -2198,9 +2653,9 @@
                     <div style="background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.15); padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                             <span style="font-weight: bold; color: var(--warning);">QUEUE SPIKE DETECTED</span>
-                            <span style="font-size: 0.75rem; background: rgba(245,158,11,0.2); padding: 2px 6px; border-radius: 4px; color: var(--warning);">STATUS: CRITICAL</span>
+                            <span style="font-size: 0.75rem; background: rgba(245,158,11,0.2); padding: 2px 6px; border-radius: 4px; color: var(--warning);">STATUS: ACTIVE</span>
                         </div>
-                        <span style="font-size: 0.8rem;">Current Queue Depth is <strong>2 customers</strong>. Estimated checkout wait time is 4.5 minutes.</span>
+                        <span style="font-size: 0.8rem;">Current Queue Depth is monitored by overhead cameras. Wait times are calculated in real time.</span>
                     </div>
                     
                     <strong>Active Cashier Registers (Node Monitor)</strong>:
@@ -2215,13 +2670,23 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td>REGISTER #1</td>
+                                <td>
+                                    <div class="table-avatar-cell">
+                                        <img src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?fit=crop&w=80&h=80&q=80" class="table-avatar">
+                                        <span>REGISTER #1</span>
+                                    </div>
+                                </td>
                                 <td><span style="color: var(--success); font-weight: bold;">● ACTIVE</span></td>
                                 <td>90% Load</td>
                                 <td>Locked</td>
                             </tr>
                             <tr>
-                                <td>REGISTER #2</td>
+                                <td>
+                                    <div class="table-avatar-cell">
+                                        <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?fit=crop&w=80&h=80&q=80" class="table-avatar">
+                                        <span>REGISTER #2</span>
+                                    </div>
+                                </td>
                                 <td><span style="color: var(--text-secondary);">● STANDBY (IDLE)</span></td>
                                 <td>0% Load</td>
                                 <td><button onclick="dispatchCashier(2)" style="background: var(--primary); border:none; color:#fff; font-size:0.7rem; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">DISPATCH NOW</button></td>
@@ -2231,6 +2696,316 @@
                 `;
             }
             
+            lucide.createIcons();
+        }
+
+        // --- Interactive Modals for Visualizer Grid & Panels ---
+        function openCCTVInspectorModal() {
+            const modal = document.getElementById('module-modal');
+            const titleText = document.getElementById('modal-title-text');
+            const bodyContent = document.getElementById('modal-body-content');
+            
+            const activeCamName = document.getElementById('cv-cam-name').textContent;
+            titleText.innerHTML = `<i data-lucide="video" style="color: var(--primary); width: 20px; height: 20px;"></i> CCTV Stream Inspector - ${activeCamName}`;
+            
+            let visitorsHtml = '';
+            visualizerVisitors.forEach(v => {
+                let imgUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?fit=crop&w=150&h=150&q=80';
+                if (v.id === 'VIS_custB02') imgUrl = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?fit=crop&w=150&h=150&q=80';
+                else if (v.id === 'VIS_custC02') imgUrl = 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?fit=crop&w=150&h=150&q=80';
+                else if (v.is_staff) imgUrl = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?fit=crop&w=150&h=150&q=80';
+                else if (v.id === 'VIS_custD03') imgUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?fit=crop&w=150&h=150&q=80';
+                
+                visitorsHtml += `
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px; margin-bottom: 8px;">
+                        <img src="${imgUrl}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid ${v.color};">
+                        <div style="flex-grow: 1;">
+                            <div style="font-weight: bold; color: var(--text-primary); font-size: 0.85rem;">${v.id} ${v.is_staff ? '<span class="badge-staff" style="font-size:0.65rem;">STAFF</span>' : ''}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">State: ${v.state || v.current_zone || 'SALES_FLOOR'} | Conf: ${Math.round(v.conf*100)}%</div>
+                        </div>
+                        <div>
+                            <button onclick="trackVisitor('${v.id}')" style="background: ${v.color}; border:none; color:#080a10; font-size:0.7rem; padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:bold; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">TRACK LIVE</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (visualizerVisitors.length === 0) {
+                visitorsHtml = '<div style="text-align: center; color: var(--text-secondary); padding: 1rem;">No active targets in camera view.</div>';
+            }
+
+            bodyContent.innerHTML = `
+                <div style="margin-bottom: 1.25rem;">
+                    <strong>Live Camera Node Analysis</strong>: Detailed computer vision object telemetry for camera <strong>${activeCamName}</strong>.
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03);">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">INFERENCE SPEED</div>
+                        <div style="font-size: 1.25rem; font-weight: bold; color: var(--primary);">4.2 ms (YOLOv8n)</div>
+                    </div>
+                    <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03);">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">STREAM RESOLUTION</div>
+                        <div style="font-size: 1.25rem; font-weight: bold; color: var(--success);">1080p @ 30 FPS</div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 0.5rem; font-weight: bold; font-size: 0.85rem; color: var(--text-primary);">CORRELATED VISITOR SNAPSHOTS:</div>
+                <div style="max-height: 220px; overflow-y: auto; padding-right: 4px;">
+                    ${visitorsHtml}
+                </div>
+                
+                <div style="margin-top: 1.25rem; font-size: 0.75rem; color: var(--text-secondary); background: rgba(108,92,231,0.05); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(108,92,231,0.15);">
+                    <strong>CCTV Neural Feed Node</strong>: Face snapshots are cross-referenced with edge Re-ID vector indices to preserve user privacy while maintaining session tracking.
+                </div>
+            `;
+            
+            modal.classList.add('show');
+            lucide.createIcons();
+        }
+
+        function openZoneModal(zoneId) {
+            const modal = document.getElementById('module-modal');
+            const titleText = document.getElementById('modal-title-text');
+            const bodyContent = document.getElementById('modal-body-content');
+            
+            titleText.innerHTML = `<i data-lucide="map" style="color: var(--success); width: 20px; height: 20px;"></i> Zone Diagnostics - ${zoneId}`;
+            
+            let description = '';
+            let associatedCamera = '';
+            let strategy = '';
+            
+            if (zoneId === 'ENTRY') {
+                description = 'Entry/Exit transition portal monitored by entry stereoscopic cameras to log customer arrivals and exits.';
+                associatedCamera = 'CAM_ENTRY_02';
+                strategy = 'Monitor footfall conversion rates. Optimize storefront displays to maximize entrance conversion.';
+            } else if (zoneId === 'SKINCARE') {
+                description = 'Sales floor cosmetic skincare zone. Includes moisturizer racks, serums, facial cleansers.';
+                associatedCamera = 'CAM_MAIN_02';
+                strategy = 'A/B test pricing labels or display placement. If dwell is high but conversion is low, review customer friction points.';
+            } else if (zoneId === 'HAIRCARE') {
+                description = 'Hair styling and wash products section. Shampoos, conditioners, hair colorings, oils.';
+                associatedCamera = 'CAM_MAIN_02';
+                strategy = 'Ensure stock replenishment is triggered. High dwell in this area suggests strong product interest.';
+            } else if (zoneId === 'BILLING') {
+                description = 'Checkout registers counter and queue area. Monitored by overhead cameras to compute wait times.';
+                associatedCamera = 'CAM_BILL_02';
+                strategy = 'Manage checkout wait threshold. Deploy standby cashier counters if queue length exceeds 5.';
+            }
+            
+            bodyContent.innerHTML = `
+                <div style="margin-bottom: 1.25rem;">
+                    <strong>Spatial Zone Telemetry Audit</strong> for <strong>${zoneId}</strong>.
+                </div>
+                
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); padding: 1rem; border-radius: 12px; margin-bottom: 1.25rem;">
+                    <div style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-primary);">Zone Description:</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">${description}</div>
+                    
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                        <span><strong>Associated Camera Node:</strong></span>
+                        <span style="font-family: monospace; color: var(--primary);">${associatedCamera}</span>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1.25rem;">
+                    <div style="font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--text-primary);">Zone Operational Strategy:</div>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${strategy}</div>
+                </div>
+                
+                <div style="font-size: 0.75rem; color: var(--text-secondary); background: rgba(16,185,129,0.05); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(16,185,129,0.15);">
+                    <strong>Interactive Store Map Tip</strong>: Click other zones on the floor plan to view their respective diagnostics.
+                </div>
+            `;
+            
+            modal.classList.add('show');
+            lucide.createIcons();
+        }
+
+        function openFunnelModal() {
+            const modal = document.getElementById('module-modal');
+            const titleText = document.getElementById('modal-title-text');
+            const bodyContent = document.getElementById('modal-body-content');
+            
+            titleText.innerHTML = `<i data-lucide="filter" style="color: var(--primary); width: 20px; height: 20px;"></i> Conversion Funnel Deep-Dive`;
+            
+            bodyContent.innerHTML = `
+                <div style="margin-bottom: 1.25rem;">
+                    <strong>Customer Shopping Funnel & Checkout Ledger</strong>: Tracks customer progression from entry footfall to POS transaction completion.
+                </div>
+                
+                <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03); margin-bottom: 1.25rem;">
+                    <strong style="font-size:0.85rem; color:var(--text-primary);">Conversion Pipeline Stages:</strong>
+                    <ol style="font-size:0.8rem; line-height:1.8; margin-top:0.5rem; padding-left:1.25rem; color:var(--text-secondary);">
+                        <li><strong>Stage 1 (Store Footfall)</strong>: Registered ENTRY event by CCTV cameras.</li>
+                        <li><strong>Stage 2 (Zone Visit Engagement)</strong>: Visited at least one product zone (SKINCARE, HAIRCARE).</li>
+                        <li><strong>Stage 3 (Queue Entry)</strong>: Joined the billing counter queue line.</li>
+                        <li><strong>Stage 4 (Completed Purchase)</strong>: POS transaction matched within 5 minutes of queue entry.</li>
+                    </ol>
+                </div>
+
+                <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.25rem;">
+                    <strong>Real-Time Funnel Insights:</strong>
+                    <ul style="margin-top:0.4rem; padding-left:1.25rem;">
+                        <li>Deduplicates customer re-entry within 60 seconds.</li>
+                        <li>Filters out store associates and staff events.</li>
+                        <li>Attributes checkout queue abandonment immediately when visitors exit without checkout sync.</li>
+                    </ul>
+                </div>
+                
+                <div style="font-size: 0.75rem; color: var(--text-secondary); background: rgba(108,92,231,0.05); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(108,92,231,0.15);">
+                    <strong>Real-time update</strong>: The bar graph on the main dashboard updates every 5 seconds as the live store simulator processes customers.
+                </div>
+            `;
+            
+            modal.classList.add('show');
+            lucide.createIcons();
+        }
+
+        function openHeatmapModal() {
+            const modal = document.getElementById('module-modal');
+            const titleText = document.getElementById('modal-title-text');
+            const bodyContent = document.getElementById('modal-body-content');
+            
+            titleText.innerHTML = `<i data-lucide="layout" style="color: #f59e0b; width: 20px; height: 20px;"></i> Heatmap & Attention Diagnostics`;
+            
+            bodyContent.innerHTML = `
+                <div style="margin-bottom: 1.25rem;">
+                    <strong>Zone Dwell Intensity & Visitor Traffic Matrix</strong>.
+                </div>
+                
+                <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.25rem;">
+                    <strong>Zone Dwell Score Calculation:</strong>
+                    <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 8px; font-family: monospace; font-size: 0.75rem; color: var(--secondary); margin-top: 0.4rem; margin-bottom: 0.75rem;">
+                        Dwell Score = (Avg Zone Dwell Ms / Max Store Dwell Ms) * 100
+                    </div>
+                    The Dwell Score normalizes customer engagement on a scale of 0 to 100, letting managers quickly contrast high-traffic sections against dead zones.
+                </div>
+
+                <div style="background: rgba(245,158,11,0.05); border: 1px solid rgba(245,158,11,0.15); padding: 1rem; border-radius: 12px;">
+                    <strong style="font-size:0.85rem; color:#f59e0b; display:block; margin-bottom:0.4rem;">Dead Zone Alerts:</strong>
+                    <span style="font-size:0.8rem; color:var(--text-secondary);">If a zone registers 0 customer visits over a 30-minute interval despite active footfall, a warning alert is pushed to the anomalies feed below.</span>
+                </div>
+            `;
+            
+            modal.classList.add('show');
+            lucide.createIcons();
+        }
+
+        function openAnomaliesModal() {
+            const modal = document.getElementById('module-modal');
+            const titleText = document.getElementById('modal-title-text');
+            const bodyContent = document.getElementById('modal-body-content');
+            
+            titleText.innerHTML = `<i data-lucide="bell-ring" style="color: var(--danger); width: 20px; height: 20px;"></i> Real-Time Operational Alerts`;
+            
+            bodyContent.innerHTML = `
+                <div style="margin-bottom: 1.25rem;">
+                    <strong>Operational Inefficiencies & Bottlenecks</strong>: The backend parses events to detect issues that hurt customer experience.
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.25rem;">
+                    <div style="padding: 0.75rem; border-left: 3px solid var(--danger); background: rgba(244,63,94,0.05); border-radius: 0 8px 8px 0; font-size: 0.8rem;">
+                        <strong>Billing Queue Spike</strong>: Triggered if billing queue length exceeds 5. Open emergency cashiers to resolve.
+                    </div>
+                    <div style="padding: 0.75rem; border-left: 3px solid var(--warning); background: rgba(245,158,11,0.05); border-radius: 0 8px 8px 0; font-size: 0.8rem;">
+                        <strong>Dead Zone Warning</strong>: Triggered if a product shelf registers 0 visits in 30 minutes. Check path blockages.
+                    </div>
+                    <div style="padding: 0.75rem; border-left: 3px solid var(--primary); background: rgba(108,92,231,0.05); border-radius: 0 8px 8px 0; font-size: 0.8rem;">
+                        <strong>Conversion Collapse</strong>: Triggered if conversion drop ratio exceeds 20% compared to the 7-day baseline.
+                    </div>
+                </div>
+                
+                <div style="font-size: 0.75rem; color: var(--text-secondary); background: rgba(244,63,94,0.05); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(244,63,94,0.15);">
+                    <strong>Action Centre</strong>: Alerts automatically clear once parameters return to normal operational limits.
+                </div>
+            `;
+            
+            modal.classList.add('show');
+            lucide.createIcons();
+        }
+
+        function openSystemHealthModal() {
+            const modal = document.getElementById('module-modal');
+            const titleText = document.getElementById('modal-title-text');
+            const bodyContent = document.getElementById('modal-body-content');
+            
+            titleText.innerHTML = `<i data-lucide="activity" style="color: var(--success); width: 20px; height: 20px;"></i> System Node Health`;
+            
+            bodyContent.innerHTML = `
+                <div style="margin-bottom: 1.25rem;">
+                    <strong>API Server & Database Connection Status</strong>.
+                </div>
+                
+                <table class="ledger-table" style="margin-bottom: 1.25rem;">
+                    <thead>
+                        <tr>
+                            <th>NODE</th>
+                            <th>ENDPOINT / DETAIL</th>
+                            <th>STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>FastAPI Backend</td>
+                            <td>http://localhost:8000/</td>
+                            <td><span style="color: var(--success); font-weight: bold;">ONLINE</span></td>
+                        </tr>
+                        <tr>
+                            <td>SQLite Database</td>
+                            <td>store_intelligence.db</td>
+                            <td><span style="color: var(--success); font-weight: bold;">CONNECTED</span></td>
+                        </tr>
+                        <tr>
+                            <td>Ingest Queue</td>
+                            <td>/events/ingest</td>
+                            <td><span style="color: var(--success); font-weight: bold;">HEALTHY</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
+                    <strong>Stale feed detection</strong>: If cameras stop sending events, the \`/health\` endpoint flags the store as \`STALE_FEED\` after 10 minutes of inactivity.
+                </div>
+            `;
+            
+            modal.classList.add('show');
+            lucide.createIcons();
+        }
+
+        function openCloudSyncModal() {
+            const modal = document.getElementById('module-modal');
+            const titleText = document.getElementById('modal-title-text');
+            const bodyContent = document.getElementById('modal-body-content');
+            
+            titleText.innerHTML = `<i data-lucide="cloud-lightning" style="color: #00b0ff; width: 20px; height: 20px;"></i> GCP BigQuery Cloud Sync Hub`;
+            
+            bodyContent.innerHTML = `
+                <div style="margin-bottom: 1.25rem;">
+                    <strong>GCP BigQuery Streaming Buffer & Replication Logs</strong>.
+                </div>
+                
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.04); padding: 1rem; border-radius: 12px; margin-bottom: 1.25rem; font-family: monospace; font-size: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Target Table:</span>
+                        <span style="color: #00b0ff;">apex-retail-bq.intelligence.events</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                        <span>Sync Latency:</span>
+                        <span style="color: var(--success);">28 ms</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Ingestion Throughput:</span>
+                        <span>12.4 kb/sec</span>
+                    </div>
+                </div>
+
+                <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.25rem;">
+                    <strong>Brotli Compression Ratio</strong>: The edge nodes utilize Brotli compression (achieving an 8.4:1 ratio) before transmitting raw camera state records to central GCP BigQuery databases, saving substantial network bandwidth.
+                </div>
+            `;
+            
+            modal.classList.add('show');
             lucide.createIcons();
         }
 
