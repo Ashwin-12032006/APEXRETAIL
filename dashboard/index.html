@@ -1807,6 +1807,10 @@
         let useRealFaceDetection = true;
         let faceTrackPool = [];
         let faceTrackSeq = 0;
+        const attireSampleCanvas = document.createElement('canvas');
+        const attireSampleCtx = attireSampleCanvas.getContext('2d', { willReadFrequently: true });
+        /** Staff uniform: black formal coat (dark torso, low color saturation). */
+        const STAFF_ATTIRE = { darkLumMax: 100, chromaMax: 68, staffScoreThreshold: 0.5 };
 
         // Maps each of the 5 MP4 feeds → API camera + zone (powers funnel / heatmap)
         const CCTV_CAM_ANALYTICS = {
@@ -1899,6 +1903,114 @@
             return { x: bodyX, y: fy, w: bodyW, h: bodyH, faceX: fx, faceY: fy, faceW: fw, faceH: fh };
         }
 
+        /** Sample torso pixels from video — black coat = store staff, else customer. */
+        function classifyBlackCoatAttire(person) {
+            const video = activeVideoElement;
+            if (!video || video.readyState < 2 || !cvCanvas) {
+                return { is_staff: false, staffScore: 0, attire: 'unknown' };
+            }
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            const faceBottomCanvas = (person.faceY != null ? person.faceY + person.faceH : person.y + person.h * 0.22) + 6;
+            const torsoTop = (faceBottomCanvas / cvCanvas.height) * vh;
+            const torsoBottom = ((person.y + person.h * 0.82) / cvCanvas.height) * vh;
+            const torsoLeft = ((person.x + person.w * 0.12) / cvCanvas.width) * vw;
+            const torsoRight = ((person.x + person.w * 0.88) / cvCanvas.width) * vw;
+            const tw = Math.max(12, Math.floor(torsoRight - torsoLeft));
+            const th = Math.max(12, Math.floor(torsoBottom - torsoTop));
+            if (tw < 14 || th < 14) {
+                return { is_staff: false, staffScore: 0, attire: 'unknown' };
+            }
+            attireSampleCanvas.width = 28;
+            attireSampleCanvas.height = 40;
+            try {
+                attireSampleCtx.drawImage(video, torsoLeft, torsoTop, tw, th, 0, 0, 28, 40);
+            } catch (e) {
+                return { is_staff: false, staffScore: 0, attire: 'unknown' };
+            }
+            const data = attireSampleCtx.getImageData(0, 0, 28, 40).data;
+            let darkCount = 0;
+            let total = 0;
+            let lumSum = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] < 100) continue;
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+                lumSum += lum;
+                total++;
+                if (lum < STAFF_ATTIRE.darkLumMax && chroma < STAFF_ATTIRE.chromaMax) darkCount++;
+            }
+            if (total < 20) {
+                return { is_staff: false, staffScore: 0, attire: 'unknown' };
+            }
+            const darkRatio = darkCount / total;
+            const avgLum = lumSum / total;
+            const staffScore = Math.min(1, darkRatio * 1.05 + (avgLum < 78 ? 0.12 : 0));
+            const is_staff = staffScore >= STAFF_ATTIRE.staffScoreThreshold;
+            return {
+                is_staff,
+                staffScore,
+                attire: is_staff ? 'black_coat' : 'customer'
+            };
+        }
+
+        function applyAttireRoleToPerson(person, trackRef) {
+            const attire = classifyBlackCoatAttire(person);
+            if (trackRef) {
+                trackRef.attireHistory = trackRef.attireHistory || [];
+                trackRef.attireHistory.push(attire.staffScore);
+                if (trackRef.attireHistory.length > 12) trackRef.attireHistory.shift();
+                const avg = trackRef.attireHistory.reduce((a, b) => a + b, 0) / trackRef.attireHistory.length;
+                person.staffScore = avg;
+                person.is_staff = avg >= STAFF_ATTIRE.staffScoreThreshold;
+            } else {
+                person.staffScore = attire.staffScore;
+                person.is_staff = attire.is_staff;
+            }
+            person.role = person.is_staff ? 'STAFF' : 'CUSTOMER';
+            person.attire = person.is_staff ? 'black_coat' : 'customer';
+            const conf = person.score ?? person.conf ?? 0.5;
+            person.color = person.is_staff ? '#ff00ff' : (conf > 0.55 ? '#00ff66' : '#f59e0b');
+            return person;
+        }
+
+        function applyAttireToAllDetectedFaces() {
+            activeDetectedFaces.forEach(f => {
+                const track = faceTrackPool.find(t => t.id === f.id);
+                applyAttireRoleToPerson(f, track);
+            });
+        }
+
+        function refreshStaffAttireForSimulatedShoppers() {
+            if (!mainVideoReady || !activeVideoElement || activeVideoElement.readyState < 2) return;
+            allStoreShoppers.forEach(s => {
+                if (!isVisibleOnActiveCamera(s)) return;
+                const person = {
+                    x: s.x, y: s.y, w: s.w, h: s.h,
+                    faceY: s.y + 4, faceH: Math.round(s.h * 0.38)
+                };
+                const attire = classifyBlackCoatAttire(person);
+                s._attireHistory = s._attireHistory || [];
+                s._attireHistory.push(attire.staffScore);
+                if (s._attireHistory.length > 10) s._attireHistory.shift();
+                const avg = s._attireHistory.reduce((a, b) => a + b, 0) / s._attireHistory.length;
+                const wasStaff = s.is_staff;
+                s.is_staff = avg >= STAFF_ATTIRE.staffScoreThreshold;
+                s.role = s.is_staff ? 'STAFF' : 'CUSTOMER';
+                if (s.is_staff) {
+                    s.color = '#ff00ff';
+                } else if (!wasStaff) {
+                    if (s.current_zone === 'SKINCARE') s.color = '#00ff66';
+                    else if (s.current_zone === 'HAIRCARE') s.color = '#a8a5e6';
+                    else if (s.current_zone === 'BILLING') s.color = '#f59e0b';
+                    else s.color = '#00ff66';
+                }
+            });
+        }
+
         function assignStableFaceTracks(detections) {
             const now = Date.now();
             const out = [];
@@ -1928,7 +2040,7 @@
                 } else {
                     faceTrackSeq += 1;
                     id = `VIS_live_${String(faceTrackSeq).padStart(3, '0')}`;
-                    const track = { id, box, lastSeen: now };
+                    const track = { id, box, lastSeen: now, attireHistory: [] };
                     faceTrackPool.push(track);
                     matchedTracks.add(track);
                 }
@@ -2161,9 +2273,12 @@
                 const displaySize = { width: cvCanvas.width, height: cvCanvas.height };
                 const detections = await runMultiModelFaceDetect(activeVideoElement, displaySize);
                 activeDetectedFaces = assignStableFaceTracks(detections);
+                applyAttireToAllDetectedFaces();
                 const facesEl = document.getElementById('cv-stat-faces');
                 if (facesEl) {
-                    facesEl.textContent = `${activeDetectedFaces.length} face${activeDetectedFaces.length === 1 ? '' : 's'} (live CV)`;
+                    const staffN = activeDetectedFaces.filter(f => f.is_staff).length;
+                    const custN = activeDetectedFaces.length - staffN;
+                    facesEl.textContent = `${activeDetectedFaces.length} tracked · ${custN} cust · ${staffN} staff (black coat)`;
                 }
                 refreshLiveFaceCropsFromDetections();
                 if (faceCropFrameCounter % 12 === 0) updateFaceSidebarFromDetections();
@@ -2216,12 +2331,16 @@
             activeDetectedFaces.forEach(f => {
                 const img = liveFaceCache[f.id] || '';
                 const pct = Math.round((f.score || f.conf || 0) * 100);
+                const roleBadge = f.is_staff
+                    ? '<span class="badge-staff" style="font-size:0.55rem;margin-left:4px;">STAFF</span>'
+                    : '<span class="badge-cust" style="font-size:0.55rem;margin-left:4px;">CUSTOMER</span>';
+                const attireHint = f.is_staff ? 'Black coat uniform' : 'Customer attire';
                 html += `
-                    <div class="cv-face-card" onclick="event.stopPropagation();" title="Detected from ${camLabel(activeCamera)} video">
+                    <div class="cv-face-card" onclick="event.stopPropagation();" title="${attireHint} · ${camLabel(activeCamera)}">
                         <img src="${img}" class="cv-face-avatar" alt="${f.id}">
                         <div class="cv-face-info">
-                            <span class="cv-face-id">${f.id}</span>
-                            <span class="cv-face-match">${pct}% Re-ID</span>
+                            <span class="cv-face-id">${f.id}${roleBadge}</span>
+                            <span class="cv-face-match">${pct}% Re-ID · ${f.attire || 'unknown'}</span>
                         </div>
                     </div>`;
             });
@@ -2268,11 +2387,13 @@
                 } catch (e) { /* skip */ }
             }
             cvCtx.fillStyle = f.color;
-            cvCtx.fillRect(f.x - 1, f.y - 14, Math.max(100, f.w + 2), 14);
+            const labelW = Math.max(130, f.w + 2);
+            cvCtx.fillRect(f.x - 1, f.y - 14, labelW, 14);
             cvCtx.fillStyle = '#080a10';
             cvCtx.font = 'bold 9px monospace';
             const pct = Math.round((f.score || f.conf || 0) * 100);
-            cvCtx.fillText(`${f.id} ${pct}% Re-ID`, f.x + 3, f.y - 3);
+            const roleTag = f.is_staff ? 'STAFF · BLACK COAT' : 'CUSTOMER';
+            cvCtx.fillText(`${f.id} · ${roleTag} ${pct}%`, f.x + 3, f.y - 3);
         }
 
         function mapCanvasBoxToVideo(visitor, videoEl) {
@@ -2543,6 +2664,9 @@
             if (useRealFaceDetection && faceModelsReady && !faceDetectBusy && cvFrameCounter % 5 === 0) {
                 detectFacesOnActiveVideo();
             }
+            if (cvFrameCounter % 22 === 0) {
+                refreshStaffAttireForSimulatedShoppers();
+            }
 
             const hasRealFaces = activeDetectedFaces.length > 0;
 
@@ -2761,10 +2885,12 @@
             });
 
             cvCtx.fillStyle = v.color;
-            cvCtx.fillRect(v.x - 1, v.y - 15, v.w + 2, 16);
+            const lblW = Math.max(v.w + 2, v.is_staff ? 168 : 120);
+            cvCtx.fillRect(v.x - 1, v.y - 15, lblW, 16);
             cvCtx.fillStyle = '#080a10';
             cvCtx.font = 'bold 9.5px monospace';
-            cvCtx.fillText(`${v.id} (${Math.round(v.conf * 100)}%)`, v.x + 3, v.y - 4);
+            const roleLbl = v.is_staff ? 'STAFF · BLACK COAT' : 'CUSTOMER';
+            cvCtx.fillText(`${v.id} · ${roleLbl}`, v.x + 3, v.y - 4);
 
             cvCtx.fillStyle = v.color;
             cvCtx.beginPath();
@@ -2859,7 +2985,33 @@
             // Update positions dynamically
             animateStoreShoppers();
 
+            const renderMapDot = (id, isStaff, pctX, pctY, title, onClick) => {
+                const dot = document.createElement('div');
+                dot.className = `visitor-dot ${isStaff ? 'staff' : ''} ${id === trackedVisitorId ? 'tracked' : ''}`;
+                dot.setAttribute('data-id', id);
+                dot.style.cursor = 'pointer';
+                dot.onclick = onClick || ((e) => { e.stopPropagation(); trackVisitor(id); });
+                dot.title = title;
+                dot.style.left = `${Math.max(5, Math.min(95, pctX))}%`;
+                dot.style.top = `${Math.max(5, Math.min(95, pctY))}%`;
+                mapContainer.appendChild(dot);
+                if (id === trackedVisitorId) {
+                    trackedVisitorPctX = pctX;
+                    trackedVisitorPctY = pctY;
+                }
+            };
+
+            if (activeDetectedFaces.length && cvCanvas) {
+                activeDetectedFaces.forEach(f => {
+                    const pctX = ((f.x + f.w / 2) / cvCanvas.width) * 100;
+                    const pctY = ((f.y + f.h / 2) / cvCanvas.height) * 100;
+                    const role = f.is_staff ? 'Staff (black coat)' : 'Customer';
+                    renderMapDot(f.id, f.is_staff, pctX, pctY, `${f.id} · ${role}`, null);
+                });
+            }
+
             allStoreShoppers.forEach(v => {
+                if (activeDetectedFaces.length) return;
                 let isTracked = (v.id === trackedVisitorId);
                 const dot = document.createElement('div');
                 dot.className = `visitor-dot ${v.is_staff ? 'staff' : ''} ${isTracked ? 'tracked' : ''}`;
@@ -2871,7 +3023,7 @@
                     trackVisitor(v.id);
                 };
                 
-                dot.title = `${v.id} (${v.is_staff ? 'Staff' : 'Customer'}) - Zone: ${v.current_zone}`;
+                dot.title = `${v.id} (${v.is_staff ? 'Staff (black coat)' : 'Customer'}) - Zone: ${v.current_zone}`;
                 
                 let pctX = v.mapX;
                 let pctY = v.mapY;
@@ -2926,12 +3078,22 @@
                         cctvVisitorPool[cam].push(`VIS_${cam}_${crypto.randomUUID().slice(0, 8)}`);
                     }
                     for (let i = 0; i < footfall; i++) {
-                        const visitor_id = cctvVisitorPool[cam][i];
+                        let visitor_id = cctvVisitorPool[cam][i];
+                        const liveFace = (cam === activeCamera && activeDetectedFaces[i]) ? activeDetectedFaces[i] : null;
+                        const isStaff = liveFace ? !!liveFace.is_staff : false;
+                        if (isStaff && !String(visitor_id).startsWith('STAFF_')) {
+                            visitor_id = `STAFF_${cam}_${crypto.randomUUID().slice(0, 8)}`;
+                            cctvVisitorPool[cam][i] = visitor_id;
+                        } else if (!isStaff && String(visitor_id).startsWith('STAFF_')) {
+                            visitor_id = `VIS_${cam}_${crypto.randomUUID().slice(0, 8)}`;
+                            cctvVisitorPool[cam][i] = visitor_id;
+                        }
                         const event_type = cfg.eventTypes[i % cfg.eventTypes.length];
                         const dwell_ms = event_type.includes('DWELL')
                             ? 25000 + Math.floor(Math.random() * 90000)
                             : 0;
                         const meta = { session_seq: (i % 3) + 1 };
+                        if (isStaff) meta.attire = 'black_coat';
                         if (cfg.zone_id === 'SKINCARE') meta.sku_zone = 'MOISTURISER';
                         if (cfg.zone_id === 'HAIRCARE') meta.sku_zone = 'SHAMPOO';
                         if (event_type === 'BILLING_QUEUE_JOIN') meta.queue_depth = 1 + Math.floor(Math.random() * 4);
@@ -2944,7 +3106,7 @@
                             timestamp: isoUtcNow(),
                             zone_id: cfg.zone_id,
                             dwell_ms,
-                            is_staff: false,
+                            is_staff: isStaff,
                             confidence: Math.round((0.88 + Math.random() * 0.1) * 100) / 100,
                             metadata: meta
                         });

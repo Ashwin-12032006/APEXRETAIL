@@ -10,6 +10,7 @@ class EventMetadataSchema(BaseModel):
     queue_depth: Optional[int] = None
     sku_zone: Optional[str] = None
     session_seq: Optional[int] = None
+    attire: Optional[str] = None  # e.g. black_coat for staff uniform
 
 class EventSchema(BaseModel):
     event_id: str = Field(..., description="UUID v4 globally unique identifier")
