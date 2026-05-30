@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: store_intelligence_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Map the data folder to persist the SQLite database locally
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:////app/data/store_intelligence.db
+      - API_URL=http://localhost:8000
+    restart: unless-stopped

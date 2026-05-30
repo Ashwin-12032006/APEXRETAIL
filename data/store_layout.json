@@ -1,0 +1,79 @@
+{
+  "stores": [
+    {
+      "store_id": "STORE_BLR_001",
+      "store_name": "Apex Retail - Indiranagar",
+      "city": "Bengaluru",
+      "open_hours": {
+        "open": "10:00",
+        "close": "22:00"
+      },
+      "zones": [
+        {"zone_id": "ENTRY_EXIT", "name": "Entry/Exit", "camera_id": "CAM_ENTRY_01"},
+        {"zone_id": "SKINCARE", "name": "Skincare Area", "camera_id": "CAM_MAIN_01", "sku_zones": ["MOISTURISER", "SERUM"]},
+        {"zone_id": "COSMETICS", "name": "Cosmetics Area", "camera_id": "CAM_MAIN_01", "sku_zones": ["LIPSTICK", "FOUNDATION"]},
+        {"zone_id": "BILLING", "name": "Billing Counter", "camera_id": "CAM_BILL_01"}
+      ]
+    },
+    {
+      "store_id": "STORE_BLR_002",
+      "store_name": "Apex Retail - Koramangala",
+      "city": "Bengaluru",
+      "open_hours": {
+        "open": "10:00",
+        "close": "22:00"
+      },
+      "zones": [
+        {"zone_id": "ENTRY_EXIT", "name": "Entry/Exit", "camera_id": "CAM_ENTRY_02"},
+        {"zone_id": "SKINCARE", "name": "Skincare Area", "camera_id": "CAM_MAIN_02", "sku_zones": ["MOISTURISER", "SERUM"]},
+        {"zone_id": "HAIRCARE", "name": "Haircare Area", "camera_id": "CAM_MAIN_02", "sku_zones": ["SHAMPOO", "CONDITIONER"]},
+        {"zone_id": "BILLING", "name": "Billing Counter", "camera_id": "CAM_BILL_02"}
+      ]
+    },
+    {
+      "store_id": "STORE_DEL_001",
+      "store_name": "Apex Retail - Connaught Place",
+      "city": "Delhi",
+      "open_hours": {
+        "open": "11:00",
+        "close": "23:00"
+      },
+      "zones": [
+        {"zone_id": "ENTRY_EXIT", "name": "Entry/Exit", "camera_id": "CAM_ENTRY_03"},
+        {"zone_id": "FRAGRANCE", "name": "Fragrance Gallery", "camera_id": "CAM_MAIN_03", "sku_zones": ["PERFUME", "DEODORANT"]},
+        {"zone_id": "SKINCARE", "name": "Skincare Area", "camera_id": "CAM_MAIN_03", "sku_zones": ["SUNSCREEN", "CLEANSER"]},
+        {"zone_id": "BILLING", "name": "Billing Counter", "camera_id": "CAM_BILL_03"}
+      ]
+    },
+    {
+      "store_id": "STORE_MUM_001",
+      "store_name": "Apex Retail - Bandra West",
+      "city": "Mumbai",
+      "open_hours": {
+        "open": "10:00",
+        "close": "22:00"
+      },
+      "zones": [
+        {"zone_id": "ENTRY_EXIT", "name": "Entry/Exit", "camera_id": "CAM_ENTRY_04"},
+        {"zone_id": "COSMETICS", "name": "Cosmetics Area", "camera_id": "CAM_MAIN_04", "sku_zones": ["EYELINER", "MASCARA"]},
+        {"zone_id": "WELLNESS", "name": "Wellness Section", "camera_id": "CAM_MAIN_04", "sku_zones": ["VITAMINS", "SUPPLEMENTS"]},
+        {"zone_id": "BILLING", "name": "Billing Counter", "camera_id": "CAM_BILL_04"}
+      ]
+    },
+    {
+      "store_id": "STORE_MUM_002",
+      "store_name": "Apex Retail - Colaba",
+      "city": "Mumbai",
+      "open_hours": {
+        "open": "10:00",
+        "close": "22:00"
+      },
+      "zones": [
+        {"zone_id": "ENTRY_EXIT", "name": "Entry/Exit", "camera_id": "CAM_ENTRY_05"},
+        {"zone_id": "SKINCARE", "name": "Skincare Area", "camera_id": "CAM_MAIN_05", "sku_zones": ["MOISTURISER", "FACEWASH"]},
+        {"zone_id": "HAIRCARE", "name": "Haircare Area", "camera_id": "CAM_MAIN_05", "sku_zones": ["OIL", "SERUM"]},
+        {"zone_id": "BILLING", "name": "Billing Counter", "camera_id": "CAM_BILL_05"}
+      ]
+    }
+  ]
+}

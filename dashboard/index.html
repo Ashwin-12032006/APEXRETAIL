@@ -1,0 +1,2296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apex Retail Store Intelligence Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons via CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #080a10;
+            --surface-color: rgba(16, 20, 35, 0.65);
+            --surface-glow: rgba(108, 92, 231, 0.05);
+            --card-border: rgba(255, 255, 255, 0.06);
+            --card-border-hover: rgba(108, 92, 231, 0.3);
+            
+            --text-primary: #f1f3f9;
+            --text-secondary: #8a99ad;
+            
+            --primary: #6c5ce7;
+            --primary-glow: rgba(108, 92, 231, 0.4);
+            --secondary: #a8a5e6;
+            
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.15);
+            --warning: #f59e0b;
+            --warning-glow: rgba(245, 158, 11, 0.15);
+            --danger: #f43f5e;
+            --danger-glow: rgba(244, 63, 94, 0.15);
+            
+            --font-main: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 10% 20%, rgba(108, 92, 231, 0.12) 0px, transparent 50%),
+                radial-gradient(at 90% 80%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
+                radial-gradient(at 50% 50%, rgba(244, 63, 94, 0.04) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding-bottom: 2rem;
+        }
+
+        /* Container Layout */
+        .dashboard-container {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+        }
+
+        /* Glassmorphism Common Style */
+        .glass-panel {
+            background: var(--surface-color);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .glass-panel:hover {
+            border-color: var(--card-border-hover);
+            box-shadow: 0 8px 32px 0 rgba(108, 92, 231, 0.08), 0 0 1px 0 rgba(108, 92, 231, 0.3);
+        }
+
+        /* Header Styling */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding: 1.25rem 2rem;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .brand-icon {
+            background: linear-gradient(135deg, var(--primary), #a8a5e6);
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px var(--primary-glow);
+            color: #fff;
+        }
+
+        .brand-text h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(to right, #ffffff, #dcdde1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 30px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .connection-status.offline {
+            background: rgba(244, 63, 94, 0.1);
+            color: var(--danger);
+            border-color: rgba(244, 63, 94, 0.2);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+            box-shadow: 0 0 10px currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+
+        /* Custom Dropdown Styling */
+        .store-selector-wrapper {
+            position: relative;
+        }
+
+        .store-selector {
+            appearance: none;
+            background: rgba(20, 24, 45, 0.8);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 0.65rem 2.5rem 0.65rem 1.25rem;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 12px;
+            cursor: pointer;
+            outline: none;
+            font-family: var(--font-main);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s;
+        }
+
+        .store-selector:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .store-selector-wrapper::after {
+            content: '▼';
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            position: absolute;
+            right: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+
+        /* Refresh Ticker */
+        .refresh-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .ticker-circle {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        /* KPI Grid Layout */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 150px;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .kpi-card:hover::before {
+            opacity: 1;
+        }
+
+        .kpi-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .kpi-icon {
+            background: rgba(255, 255, 255, 0.04);
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .kpi-card.visitors .kpi-icon { color: var(--primary); }
+        .kpi-card.conversion .kpi-icon { color: var(--success); }
+        .kpi-card.dwell .kpi-icon { color: #f59e0b; }
+        .kpi-card.queue .kpi-icon { color: var(--danger); }
+
+        .kpi-body {
+            margin-top: 1rem;
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+            line-height: 1;
+            margin-bottom: 0.25rem;
+        }
+
+        .kpi-subtext {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .trend-up { color: var(--success); }
+        .trend-down { color: var(--danger); }
+
+        /* Main Dashboard Panel Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .panel-title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .panel-body {
+            padding: 1.5rem;
+            position: relative;
+        }
+
+        /* Funnel Layout */
+        .chart-container {
+            position: relative;
+            height: 320px;
+            width: 100%;
+        }
+
+        /* Heatmap Grid Visual */
+        .zone-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.95rem;
+        }
+
+        .zone-row {
+            display: flex;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+
+        .zone-row:hover {
+            background: rgba(255, 255, 255, 0.04);
+            transform: translateX(4px);
+        }
+
+        .zone-name {
+            width: 110px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .zone-bar-wrapper {
+            flex-grow: 1;
+            margin: 0 1.5rem;
+        }
+
+        .zone-bar-bg {
+            height: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .zone-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 5px;
+            width: 0%;
+            transition: width 1s ease-in-out;
+        }
+
+        .zone-stats {
+            text-align: right;
+            width: 80px;
+        }
+
+        .zone-visits {
+            font-weight: 700;
+            font-size: 0.95rem;
+            line-height: 1.2;
+        }
+
+        .zone-dwell-score {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Lower Row: Anomalies & Analytics Summary */
+        .bottom-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .bottom-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Anomalies List */
+        .anomalies-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 0.5rem;
+        }
+
+        .anomalies-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .anomalies-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 3px;
+        }
+        .anomalies-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .anomaly-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.9rem 1.10rem;
+            border-radius: 12px;
+            border-left: 4px solid var(--danger);
+            background: rgba(244, 63, 94, 0.04);
+            border-top: 1px solid rgba(255, 255, 255, 0.02);
+            border-right: 1px solid rgba(255, 255, 255, 0.02);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+            transition: transform 0.2s;
+        }
+
+        .anomaly-item:hover {
+            transform: scale(1.01);
+        }
+
+        .anomaly-item.CRITICAL {
+            border-left-color: var(--danger);
+            background: rgba(244, 63, 94, 0.05);
+        }
+
+        .anomaly-item.WARNING {
+            border-left-color: var(--warning);
+            background: rgba(245, 158, 11, 0.05);
+        }
+
+        .anomaly-item.INFO {
+            border-left-color: var(--primary);
+            background: rgba(108, 92, 231, 0.05);
+        }
+
+        .anomaly-icon {
+            margin-top: 0.1rem;
+            flex-shrink: 0;
+        }
+
+        .anomaly-content {
+            flex-grow: 1;
+        }
+
+        .anomaly-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.2rem;
+        }
+
+        .anomaly-type {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .anomaly-time {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .anomaly-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.35;
+        }
+
+        .no-anomalies {
+            padding: 3rem 0;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* API Quick Info & Simulated Controls Panel */
+        .api-info-panel {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .api-stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+        }
+
+        .api-stat-label {
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .api-stat-val {
+            font-weight: 600;
+            font-family: monospace;
+        }
+
+        .alert-pulse {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--success);
+            margin-right: 5px;
+        }
+
+        /* CSS Skeleton Loading */
+        .skeleton {
+            background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+            color: transparent !important;
+        }
+
+        .skeleton * {
+            visibility: hidden;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Custom notifications toast */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            background: rgba(16, 20, 35, 0.95);
+            border: 1px solid var(--card-border);
+            border-left: 4px solid var(--primary);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* --- CV Monitor and Floor Plan Layout --- */
+        .visualizer-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .visualizer-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .cv-monitor-box {
+            position: relative;
+            background: #020308;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+            height: 380px;
+            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.95), 0 8px 32px 0 rgba(0,0,0,0.5);
+            transition: all 0.4s;
+        }
+
+        .cv-monitor-box:hover {
+            border-color: var(--card-border-hover);
+            box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.95), 0 8px 32px 0 rgba(108, 92, 231, 0.08);
+        }
+
+        .cv-overlay {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #00ff66;
+            text-shadow: 0 0 5px rgba(0,255,102,0.8);
+        }
+
+        .cv-rec-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #ff3b30;
+            border-radius: 50%;
+            margin-right: 5px;
+            box-shadow: 0 0 8px #ff3b30;
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { opacity: 0.3; }
+            50% { opacity: 1; }
+            100% { opacity: 0.3; }
+        }
+
+        .cv-scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #cvCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .camera-selector-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding: 0.2rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+            width: fit-content;
+        }
+
+        .cam-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: var(--font-main);
+        }
+
+        .cam-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.04);
+        }
+
+        .cam-btn.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+
+        /* Floor Plan Styles */
+        .floor-plan-box {
+            position: relative;
+            height: 380px;
+            background: rgba(10, 12, 22, 0.3);
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .floor-map-container {
+            position: relative;
+            flex-grow: 1;
+            border: 1px dashed rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .floor-zone {
+            position: absolute;
+            border: 2px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: center;
+            padding: 4px;
+        }
+
+        .floor-zone.active {
+            border-color: var(--primary);
+            background: rgba(108, 92, 231, 0.15);
+            color: #dcdde1;
+            box-shadow: 0 0 15px rgba(108, 92, 231, 0.2);
+        }
+
+        .floor-zone.billing {
+            border-color: rgba(16, 185, 129, 0.3);
+            color: var(--success);
+        }
+        .floor-zone.billing.active {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.15);
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+            color: #dcdde1;
+        }
+
+        .floor-zone.entry {
+            border-color: rgba(168, 165, 230, 0.3);
+            color: var(--secondary);
+        }
+        .floor-zone.entry.active {
+            border-color: var(--secondary);
+            background: rgba(168, 165, 230, 0.15);
+            box-shadow: 0 0 15px rgba(168, 165, 230, 0.2);
+            color: #dcdde1;
+        }
+
+        /* Moving customer dot */
+        .visitor-dot {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #00ff66;
+            border: 2px solid #080a10;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 12px #00ff66;
+            transition: all 1.8s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 100;
+        }
+
+        .visitor-dot::after {
+            content: attr(data-id);
+            position: absolute;
+            top: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: monospace;
+            font-size: 0.6rem;
+            background: rgba(16, 20, 35, 0.9);
+            color: #f1f3f9;
+            padding: 2px 5px;
+            border-radius: 4px;
+            white-space: nowrap;
+            border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            pointer-events: none;
+        }
+
+        .visitor-dot.staff {
+            background: #ff00ff;
+            box-shadow: 0 0 12px #ff00ff;
+        }
+
+        /* --- Interactive Modal Styling --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(4, 6, 12, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        .modal-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: rgba(16, 20, 35, 0.95);
+            border: 1px solid rgba(108, 92, 231, 0.25);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 650px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(108, 92, 231, 0.15);
+            transform: translateY(30px);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .modal-close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            max-height: 450px;
+            overflow-y: auto;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* Ledger Tables */
+        .ledger-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            text-align: left;
+            margin-top: 1rem;
+        }
+
+        .ledger-table th {
+            padding: 0.6rem 0.8rem;
+            background: rgba(255,255,255,0.02);
+            color: var(--text-primary);
+            font-weight: 600;
+            border-bottom: 2px solid rgba(255,255,255,0.06);
+        }
+
+        .ledger-table td {
+            padding: 0.65rem 0.8rem;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: var(--text-secondary);
+        }
+
+        .ledger-table tr:hover td {
+            background: rgba(255,255,255,0.01);
+            color: var(--text-primary);
+        }
+
+        .badge-staff {
+            background: rgba(255, 0, 255, 0.1);
+            color: #ff00ff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,0,255,0.2);
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .badge-cust {
+            background: rgba(0, 255, 102, 0.1);
+            color: #00ff66;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(0,255,102,0.2);
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        /* Neural Signature Visualizer */
+        .vector-grid-box {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+            margin: 1rem 0;
+            padding: 0.5rem;
+            background: #04060c;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .vector-element {
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: monospace;
+            font-size: 0.65rem;
+            color: #00ff66;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <!-- Dashboard Header -->
+        <header class="glass-panel">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i data-lucide="eye" style="width: 22px; height: 22px;"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>Apex Retail Store Intelligence</h1>
+                    <p>Live Computer Vision Analytics Pipeline</p>
+                </div>
+            </div>
+
+            <div class="header-controls">
+                <div class="refresh-indicator" id="refresh-indicator">
+                    <span id="refresh-timer">Next update in 5s</span>
+                    <div class="ticker-circle"></div>
+                </div>
+
+                <div class="store-selector-wrapper">
+                    <select class="store-selector" id="store-selector" onchange="changeStore()">
+                        <option value="STORE_BLR_002" selected>STORE_BLR_002 (Koramangala)</option>
+                        <option value="STORE_BLR_001">STORE_BLR_001 (Indiranagar)</option>
+                        <option value="STORE_DEL_001">STORE_DEL_001 (Connaught Place)</option>
+                        <option value="STORE_MUM_001">STORE_MUM_001 (Bandra West)</option>
+                        <option value="STORE_MUM_002">STORE_MUM_002 (Colaba)</option>
+                    </select>
+                </div>
+
+                <div class="connection-status" id="connection-status">
+                    <div class="status-dot"></div>
+                    <span id="connection-text">Live Ingestion Online</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- KPI Grid -->
+        <div class="kpi-grid">
+            <!-- Unique Visitors -->
+            <div class="glass-panel kpi-card visitors" onclick="openKpiModal('visitors')" style="cursor: pointer;">
+                <div class="kpi-header">
+                    <span>UNIQUE VISITORS</span>
+                    <div class="kpi-icon">
+                        <i data-lucide="users" style="width: 18px; height: 18px;"></i>
+                    </div>
+                </div>
+                <div class="kpi-body">
+                    <div class="kpi-value" id="kpi-visitors">-</div>
+                    <div class="kpi-subtext">
+                        <span class="trend-up" id="kpi-visitors-trend"><i data-lucide="trending-up" style="width: 12px; height: 12px; display: inline; vertical-align: middle;"></i> +12% vs last hour</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conversion Rate -->
+            <div class="glass-panel kpi-card conversion" onclick="openKpiModal('conversion')" style="cursor: pointer;">
+                <div class="kpi-header">
+                    <span>CONVERSION RATE</span>
+                    <div class="kpi-icon">
+                        <i data-lucide="shopping-bag" style="width: 18px; height: 18px;"></i>
+                    </div>
+                </div>
+                <div class="kpi-body">
+                    <div class="kpi-value" id="kpi-conversion">-</div>
+                    <div class="kpi-subtext">
+                        <span id="kpi-conversion-subtext">0 sales completed</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dwell Time -->
+            <div class="glass-panel kpi-card dwell" onclick="openKpiModal('dwell')" style="cursor: pointer;">
+                <div class="kpi-header">
+                    <span>AVG DWELL TIME</span>
+                    <div class="kpi-icon">
+                        <i data-lucide="clock" style="width: 18px; height: 18px;"></i>
+                    </div>
+                </div>
+                <div class="kpi-body">
+                    <div class="kpi-value" id="kpi-dwell">-</div>
+                    <div class="kpi-subtext">
+                        <span id="kpi-dwell-subtext">Across active zones</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Queue Depth -->
+            <div class="glass-panel kpi-card queue" onclick="openKpiModal('queue')" style="cursor: pointer;">
+                <div class="kpi-header">
+                    <span>QUEUE DEPTH</span>
+                    <div class="kpi-icon">
+                        <i data-lucide="hourglass" style="width: 18px; height: 18px;"></i>
+                    </div>
+                </div>
+                <div class="kpi-body">
+                    <div class="kpi-value" id="kpi-queue">-</div>
+                    <div class="kpi-subtext">
+                        <span class="trend-down" id="kpi-abandonment"><i data-lucide="alert-circle" style="width: 12px; height: 12px; display: inline; vertical-align: middle;"></i> 0.0% abandonment</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live CV Stream Visualizer & Store Layout Map -->
+        <div class="visualizer-grid">
+            <!-- CCTV Live Stream Visual Monitor -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i data-lucide="video" style="color: var(--primary); width: 18px; height: 18px;"></i>
+                        <span>CCTV Visual Ingestion Feed (Real-Time Object Detection)</span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="camera-selector-bar">
+                        <button class="cam-btn active" id="btn-cam-entry" onclick="switchCamera('ENTRY')">CAM_ENTRY (Entrance)</button>
+                        <button class="cam-btn" id="btn-cam-main" onclick="switchCamera('MAIN')">CAM_MAIN (Sales Floor)</button>
+                        <button class="cam-btn" id="btn-cam-bill" onclick="switchCamera('BILL')">CAM_BILL (Billing Counter)</button>
+                    </div>
+                    <div class="cv-monitor-box">
+                        <div class="cv-overlay">
+                            <div><span class="cv-rec-dot"></span><span id="cv-cam-name">CAM_ENTRY_02</span></div>
+                            <div id="cv-timestamp">2026-05-30 14:40:00.125</div>
+                        </div>
+                        <div class="cv-scanlines"></div>
+                        <canvas id="cvCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Store Floor Plan Layout Map -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i data-lucide="map" style="color: var(--success); width: 18px; height: 18px;"></i>
+                        <span>Interactive Store Floor Plan (Tracked Customer Positions)</span>
+                    </div>
+                </div>
+                <div class="panel-body floor-plan-box">
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                        CV Re-ID pipeline tracks customers spatial coordinates dynamically. Glowing indicators represent detected individuals.
+                    </div>
+                    <div class="floor-map-container" id="floor-map">
+                        <!-- Zones outline -->
+                        <div class="floor-zone entry" style="top: 10px; left: 10px; width: 120px; height: 50px;">ENTRY / EXIT</div>
+                        <div class="floor-zone" id="map-zone-skindex" style="top: 10px; right: 10px; width: 160px; height: 100px;">SKINCARE ZONE</div>
+                        <div class="floor-zone" id="map-zone-hairdex" style="bottom: 10px; right: 10px; width: 160px; height: 100px;">HAIRCARE ZONE</div>
+                        <div class="floor-zone billing" id="map-zone-billingdex" style="bottom: 10px; left: 10px; width: 150px; height: 90px;">BILLING AREA & QUEUE</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Analytics Grid -->
+        <div class="dashboard-grid">
+            <!-- Funnel Chart Card -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i data-lucide="filter" style="color: var(--primary); width: 18px; height: 18px;"></i>
+                        <span>Conversion Funnel Analysis</span>
+                    </div>
+                    <div class="refresh-indicator" style="animation: none;">
+                        <span>4 Stages (CV Tracking to POS)</span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-container">
+                        <canvas id="funnelChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Heatmap / Zone Occupancy -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i data-lucide="layout" style="color: #f59e0b; width: 18px; height: 18px;"></i>
+                        <span>Zone Dwell & Heatmap</span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="zone-grid" id="zone-grid">
+                        <div class="no-anomalies">Loading zone metrics...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Grid: Anomalies + Details -->
+        <div class="bottom-grid">
+            <!-- Live Anomalies Feed -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i data-lucide="bell-ring" style="color: var(--danger); width: 18px; height: 18px;"></i>
+                        <span>Real-Time Intelligence & Anomalies</span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="anomalies-list" id="anomalies-list">
+                        <div class="no-anomalies">
+                            <i data-lucide="shield-check" style="width: 32px; height: 32px; color: var(--success); opacity: 0.6;"></i>
+                            <p>No active anomalies or warnings detected in this store layout.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Status / Details -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i data-lucide="activity" style="color: var(--success); width: 18px; height: 18px;"></i>
+                        <span>System Health & Node Status</span>
+                    </div>
+                </div>
+                <div class="panel-body api-info-panel">
+                    <div class="api-stat-row">
+                        <span class="api-stat-label"><i data-lucide="database" style="width: 14px;"></i> SQLite DB Link</span>
+                        <span class="api-stat-val text-success" id="health-db">Connected</span>
+                    </div>
+                    <div class="api-stat-row">
+                        <span class="api-stat-label"><i data-lucide="shield-alert" style="width: 14px;"></i> Node Status</span>
+                        <span class="api-stat-val" id="health-status">OK</span>
+                    </div>
+                    <div class="api-stat-row">
+                        <span class="api-stat-label"><i data-lucide="radio" style="width: 14px;"></i> Active CCTV Ingest Feeds</span>
+                        <span class="api-stat-val" id="health-feeds">0</span>
+                    </div>
+                    <div class="api-stat-row">
+                        <span class="api-stat-label"><i data-lucide="file-text" style="width: 14px;"></i> Health Timestamp</span>
+                        <span class="api-stat-val" id="health-time" style="font-size: 0.8rem;">-</span>
+                    </div>
+                    
+                    <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; padding: 0.75rem; border-radius: 8px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03);">
+                        <strong style="color: var(--text-primary);">Simulation Notice:</strong>
+                        To populate this dashboard with mock CCTV visual tracking data and sales, run the simulated ingest command:
+                        <code style="display: block; background: rgba(0,0,0,0.3); padding: 0.4rem; margin-top: 0.4rem; border-radius: 4px; font-family: monospace; font-size: 0.7rem; color: var(--secondary);">python -m pipeline.emit_simulated --mode batch</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cloud Synchronization Hub (Central GCP BigQuery Node) -->
+            <div class="glass-panel" style="margin-top: 1.5rem;">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i data-lucide="cloud-lightning" style="color: #00b0ff; width: 18px; height: 18px;"></i>
+                        <span>Central GCP Cloud Data Lakehouse</span>
+                    </div>
+                </div>
+                <div class="panel-body api-info-panel" style="padding: 1.25rem;">
+                    <div class="api-stat-row">
+                        <span class="api-stat-label"><i data-lucide="server" style="width: 14px;"></i> Warehouse ID</span>
+                        <span class="api-stat-val" style="color: #00b0ff;">apex-retail-lakehouse-bq</span>
+                    </div>
+                    <div class="api-stat-row">
+                        <span class="api-stat-label"><i data-lucide="zap" style="width: 14px;"></i> Cloud Sync Status</span>
+                        <span class="api-stat-val" style="color: var(--success);"><span class="alert-pulse"></span>ACTIVE (28ms latency)</span>
+                    </div>
+                    <div class="api-stat-row">
+                        <span class="api-stat-label"><i data-lucide="database-backup" style="width: 14px;"></i> Stream Ratio</span>
+                        <span class="api-stat-val">Brotli 8.4:1 Compressed</span>
+                    </div>
+                    <!-- Live Cloud sync feed ticker -->
+                    <div style="margin-top: 0.75rem; background: rgba(0,0,0,0.4); padding: 0.5rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); font-family: monospace; font-size: 0.65rem; height: 70px; overflow-y: hidden; display: flex; flex-direction: column; gap: 4px;" id="cloud-ticker">
+                        <div style="color: #8a99ad;">[INIT] Handshaking cloud data lakehouse buffer...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications Area -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Interactive Module Modal -->
+    <div class="modal-overlay" id="module-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-header-title">
+                    <i data-lucide="info" style="color: var(--primary); width: 20px; height: 20px;"></i>
+                    <span id="modal-title-text">Module Analytics</span>
+                </div>
+                <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body-content">
+                <!-- Dynamic Content Injected Here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Init Lucide Icons
+        lucide.createIcons();
+
+        let funnelChartInstance = null;
+        let selectedStore = "STORE_BLR_002";
+        let countdown = 5;
+        let refreshTimerInterval = null;
+
+        // --- Visualizer & CCTV / Floor Plan Animation variables ---
+        let activeCamera = 'ENTRY';
+        let cvCanvas, cvCtx;
+        let visualizerVisitors = [];
+        
+        function initCVVisualizer() {
+            cvCanvas = document.getElementById('cvCanvas');
+            if (!cvCanvas) return;
+            cvCtx = cvCanvas.getContext('2d');
+            
+            // Handle canvas resizing
+            function resizeCanvas() {
+                cvCanvas.width = cvCanvas.parentElement.clientWidth;
+                cvCanvas.height = cvCanvas.parentElement.clientHeight || 380;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Seed initial visualizer visitors
+            generateVisualizerVisitors();
+            
+            // Start visualizer animation loop
+            requestAnimationFrame(cvAnimationLoop);
+        }
+
+        function switchCamera(camType) {
+            activeCamera = camType;
+            document.getElementById('btn-cam-entry').classList.remove('active');
+            document.getElementById('btn-cam-main').classList.remove('active');
+            document.getElementById('btn-cam-bill').classList.remove('active');
+            
+            if (camType === 'ENTRY') {
+                document.getElementById('btn-cam-entry').classList.add('active');
+                document.getElementById('cv-cam-name').textContent = 'CAM_ENTRY_02';
+            } else if (camType === 'MAIN') {
+                document.getElementById('btn-cam-main').classList.add('active');
+                document.getElementById('cv-cam-name').textContent = 'CAM_MAIN_02';
+            } else if (camType === 'BILL') {
+                document.getElementById('btn-cam-bill').classList.add('active');
+                document.getElementById('cv-cam-name').textContent = 'CAM_BILL_02';
+            }
+            
+            generateVisualizerVisitors();
+            showToast(`Switched CCTV angle to ${camType}`);
+        }
+
+        function generateVisualizerVisitors() {
+            visualizerVisitors = [];
+            const ids = ['VIS_custA01', 'VIS_custB02', 'VIS_custC02', 'VIS_custD03', 'VIS_staff01'];
+            
+            if (activeCamera === 'ENTRY') {
+                for (let i = 0; i < 3; i++) {
+                    visualizerVisitors.push({
+                        id: ids[i],
+                        x: 50 + Math.random() * 200,
+                        y: 10 + Math.random() * 80,
+                        dx: (Math.random() - 0.5) * 0.4,
+                        dy: 1.0 + Math.random() * 1.5,
+                        w: 45,
+                        h: 90,
+                        is_staff: i === 4,
+                        conf: 0.92 + Math.random() * 0.07,
+                        color: i === 4 ? '#ff00ff' : '#00ff66',
+                        state: 'INBOUND'
+                    });
+                }
+            } else if (activeCamera === 'MAIN') {
+                for (let i = 0; i < 4; i++) {
+                    visualizerVisitors.push({
+                        id: ids[i],
+                        x: 80 + Math.random() * 200,
+                        y: 80 + Math.random() * 120,
+                        dx: (Math.random() - 0.5) * 1.2,
+                        dy: (Math.random() - 0.5) * 1.2,
+                        w: 50,
+                        h: 100,
+                        is_staff: i === 4,
+                        conf: 0.94 + Math.random() * 0.05,
+                        color: i === 4 ? '#ff00ff' : '#6c5ce7',
+                        current_zone: Math.random() > 0.5 ? 'SKINCARE' : 'HAIRCARE'
+                    });
+                }
+            } else if (activeCamera === 'BILL') {
+                for (let i = 0; i < 3; i++) {
+                    visualizerVisitors.push({
+                        id: ids[i],
+                        x: 100 + i * 65,
+                        y: 170,
+                        dx: 0,
+                        dy: 0,
+                        w: 48,
+                        h: 95,
+                        is_staff: false,
+                        conf: 0.96 + Math.random() * 0.03,
+                        color: '#f59e0b',
+                        queue_idx: i
+                    });
+                }
+            }
+        }
+
+        let flashEntryTimer = 0;
+        let flashEntryText = "";
+
+        function cvAnimationLoop() {
+            if (!cvCtx || !cvCanvas) return;
+            
+            // Ticking CCTV Milliseconds Timestamp
+            const now = new Date();
+            const timeStr = now.toISOString().replace('T', ' ').replace('Z', '') + '.' + String(now.getMilliseconds()).padStart(3, '0');
+            const tsEl = document.getElementById('cv-timestamp');
+            if (tsEl) tsEl.textContent = timeStr;
+            
+            // Clear frame
+            cvCtx.fillStyle = '#020308';
+            cvCtx.fillRect(0, 0, cvCanvas.width, cvCanvas.height);
+            
+            // Draw grid mapping perspective
+            cvCtx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
+            cvCtx.lineWidth = 1;
+            for (let x = 0; x < cvCanvas.width; x += 30) {
+                cvCtx.beginPath();
+                cvCtx.moveTo(x, 0);
+                cvCtx.lineTo(x + (x - cvCanvas.width/2)*0.2, cvCanvas.height);
+                cvCtx.stroke();
+            }
+            for (let y = 0; y < cvCanvas.height; y += 30) {
+                cvCtx.beginPath();
+                cvCtx.moveTo(0, y);
+                cvCtx.lineTo(cvCanvas.width, y);
+                cvCtx.stroke();
+            }
+            
+            // Render specific layouts based on active camera angle
+            if (activeCamera === 'ENTRY') {
+                // Draw perspective walls and entry corridor
+                cvCtx.fillStyle = 'rgba(255,255,255,0.01)';
+                cvCtx.beginPath();
+                cvCtx.moveTo(0, 0);
+                cvCtx.lineTo(60, 0);
+                cvCtx.lineTo(60, cvCanvas.height);
+                cvCtx.lineTo(0, cvCanvas.height);
+                cvCtx.fill();
+
+                // Draw automated sliding glass doors
+                cvCtx.strokeStyle = 'rgba(108, 92, 231, 0.4)';
+                cvCtx.lineWidth = 4;
+                cvCtx.strokeRect(60, 30, 110, 130);
+                cvCtx.fillStyle = 'rgba(108, 92, 231, 0.08)';
+                cvCtx.fillRect(60, 30, 110, 130);
+                
+                // Glass doors visual shine lines
+                cvCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                cvCtx.lineWidth = 1;
+                cvCtx.beginPath();
+                cvCtx.moveTo(70, 150);
+                cvCtx.lineTo(150, 40);
+                cvCtx.stroke();
+
+                // Entry Threshold Boundary
+                cvCtx.strokeStyle = 'rgba(255, 59, 48, 0.4)';
+                cvCtx.lineWidth = 3;
+                cvCtx.beginPath();
+                cvCtx.moveTo(0, 220);
+                cvCtx.lineTo(cvCanvas.width, 220);
+                cvCtx.stroke();
+                
+                cvCtx.fillStyle = 'rgba(255, 59, 48, 0.8)';
+                cvCtx.font = 'bold 10px monospace';
+                cvCtx.fillText('ENTRY THRESHOLD GATEWAY', 15, 212);
+                
+                cvCtx.strokeStyle = '#00ff66';
+                cvCtx.lineWidth = 1;
+                cvCtx.setLineDash([5, 5]);
+                cvCtx.beginPath();
+                cvCtx.moveTo(0, 180);
+                cvCtx.lineTo(cvCanvas.width, 180);
+                cvCtx.stroke();
+                cvCtx.setLineDash([]);
+                
+                visualizerVisitors.forEach(v => {
+                    v.y += v.dy;
+                    v.x += v.dx;
+                    
+                    if (v.x < 20 || v.x > cvCanvas.width - 60) v.dx *= -1;
+                    
+                    if (v.y > cvCanvas.height) {
+                        v.y = -v.h;
+                        v.x = 50 + Math.random() * (cvCanvas.width - 120);
+                        v.dy = 1.0 + Math.random() * 1.5;
+                        v.conf = 0.91 + Math.random() * 0.08;
+                    }
+                    
+                    if (v.y + v.h/2 >= 220 && v.y + v.h/2 < 220 + v.dy) {
+                        flashEntryTimer = 60;
+                        flashEntryText = `EVENT EMITTED: ENTRY - ${v.id} [CONF: ${v.conf.toFixed(2)}]`;
+                        cvCtx.fillStyle = 'rgba(0, 255, 102, 0.3)';
+                        cvCtx.fillRect(0, 210, cvCanvas.width, 20);
+                    }
+                    
+                    drawObjectBox(v);
+                });
+            } else if (activeCamera === 'MAIN') {
+                // Draw Skincare Zone bounds and visual shelves
+                cvCtx.strokeStyle = 'rgba(108, 92, 231, 0.3)';
+                cvCtx.fillStyle = 'rgba(108, 92, 231, 0.03)';
+                cvCtx.lineWidth = 2;
+                cvCtx.fillRect(cvCanvas.width - 180, 20, 160, 140);
+                cvCtx.strokeRect(cvCanvas.width - 180, 20, 160, 140);
+                
+                // Render Skincare category shelf layout bottles
+                cvCtx.fillStyle = '#6c5ce7';
+                for (let sx = cvCanvas.width - 165; sx < cvCanvas.width - 30; sx += 24) {
+                    cvCtx.fillRect(sx, 48, 12, 22); // Moisturizer creams
+                    cvCtx.fillRect(sx, 105, 14, 25); // serums
+                }
+                
+                cvCtx.fillStyle = '#6c5ce7';
+                cvCtx.font = 'bold 9px monospace';
+                cvCtx.fillText('ZONE: SKINCARE SHELF [CAM_MAIN]', cvCanvas.width - 170, 35);
+                
+                // Draw Haircare Zone bounds and visual shelves
+                cvCtx.strokeStyle = 'rgba(168, 165, 230, 0.3)';
+                cvCtx.fillStyle = 'rgba(168, 165, 230, 0.03)';
+                cvCtx.fillRect(cvCanvas.width - 180, 200, 160, 140);
+                cvCtx.strokeRect(cvCanvas.width - 180, 200, 160, 140);
+                
+                // Render Haircare category shelf layout shampoos
+                cvCtx.fillStyle = '#a8a5e6';
+                for (let hx = cvCanvas.width - 165; hx < cvCanvas.width - 30; hx += 24) {
+                    cvCtx.fillRect(hx, 225, 14, 28); // shampoo bottles
+                    cvCtx.fillRect(hx, 285, 10, 22); // hair oils
+                }
+                
+                cvCtx.fillStyle = '#a8a5e6';
+                cvCtx.fillText('ZONE: HAIRCARE SHELF [CAM_MAIN]', cvCanvas.width - 170, 215);
+                
+                visualizerVisitors.forEach(v => {
+                    v.x += v.dx;
+                    v.y += v.dy;
+                    
+                    if (v.x < 30 || v.x > cvCanvas.width - v.w - 30) v.dx *= -1;
+                    if (v.y < 30 || v.y > cvCanvas.height - v.h - 30) v.dy *= -1;
+                    
+                    const midX = v.x + v.w/2;
+                    const midY = v.y + v.h/2;
+                    
+                    if (midX > cvCanvas.width - 180 && midY > 20 && midY < 160) {
+                        v.color = '#6c5ce7';
+                        v.current_zone = 'SKINCARE';
+                    } else if (midX > cvCanvas.width - 180 && midY > 200 && midY < 340) {
+                        v.color = '#a8a5e6';
+                        v.current_zone = 'HAIRCARE';
+                    } else {
+                        v.color = '#00ff66';
+                        v.current_zone = null;
+                    }
+                    
+                    drawObjectBox(v);
+                });
+            } else if (activeCamera === 'BILL') {
+                // Draw Billing Counter desk
+                cvCtx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+                cvCtx.strokeStyle = '#10b981';
+                cvCtx.lineWidth = 2;
+                cvCtx.fillRect(20, 120, 50, 180);
+                cvCtx.strokeRect(20, 120, 50, 180);
+                
+                // Cash register terminal monitor drawing
+                cvCtx.fillStyle = '#020308';
+                cvCtx.fillRect(25, 145, 24, 18); // register screen
+                cvCtx.strokeStyle = '#10b981';
+                cvCtx.lineWidth = 1;
+                cvCtx.strokeRect(25, 145, 24, 18);
+                cvCtx.fillStyle = '#10b981';
+                cvCtx.fillRect(33, 163, 8, 12); // stand
+                cvCtx.fillRect(22, 175, 30, 4); // keyboard base
+                
+                cvCtx.fillStyle = '#10b981';
+                cvCtx.font = 'bold 9px monospace';
+                cvCtx.save();
+                cvCtx.translate(45, 210);
+                cvCtx.rotate(-Math.PI / 2);
+                cvCtx.fillText('BILLING ASSOCIATE COUNTER', 0, 0);
+                cvCtx.restore();
+                
+                cvCtx.strokeStyle = 'rgba(245, 158, 11, 0.2)';
+                cvCtx.setLineDash([3, 3]);
+                cvCtx.beginPath();
+                cvCtx.moveTo(70, 210);
+                cvCtx.lineTo(cvCanvas.width - 20, 210);
+                cvCtx.stroke();
+                cvCtx.setLineDash([]);
+                
+                cvCtx.fillStyle = '#f59e0b';
+                cvCtx.fillText(`LIVE QUEUE DEPTH: ${visualizerVisitors.length}`, 80, 140);
+                
+                visualizerVisitors.forEach((v, index) => {
+                    const targetX = 90 + index * 60;
+                    const targetY = 170 + Math.sin(Date.now()*0.003 + index)*4;
+                    
+                    v.x += (targetX - v.x) * 0.08;
+                    v.y += (targetY - v.y) * 0.08;
+                    
+                    v.color = '#f59e0b';
+                    drawObjectBox(v);
+                });
+                
+                if (Math.random() < 0.003 && visualizerVisitors.length > 0) {
+                    const checkedOut = visualizerVisitors.shift();
+                    showToast(`POS SALES TXN: ${checkedOut.id} completed billing checkout!`);
+                    
+                    setTimeout(() => {
+                        if (activeCamera === 'BILL' && visualizerVisitors.length < 5) {
+                            visualizerVisitors.push({
+                                id: 'VIS_cust' + String.fromCharCode(65 + Math.floor(Math.random()*4)) + '0' + (Math.floor(Math.random()*4)+1),
+                                x: cvCanvas.width + 50,
+                                y: 170,
+                                dx: 0,
+                                dy: 0,
+                                w: 48,
+                                h: 95,
+                                is_staff: false,
+                                conf: 0.95 + Math.random()*0.04,
+                                color: '#f59e0b'
+                            });
+                        }
+                    }, 2000);
+                }
+            }
+            
+            if (flashEntryTimer > 0) {
+                flashEntryTimer--;
+                cvCtx.fillStyle = 'rgba(0, 255, 102, 0.85)';
+                cvCtx.fillRect(15, 50, cvCanvas.width - 30, 28);
+                
+                cvCtx.fillStyle = '#080a10';
+                cvCtx.font = 'bold 11px monospace';
+                cvCtx.fillText(flashEntryText, 25, 68);
+            }
+            
+            cvCtx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+            cvCtx.fillRect(0, cvCanvas.height - 30, cvCanvas.width, 30);
+            
+            cvCtx.fillStyle = '#8a99ad';
+            cvCtx.font = '9px monospace';
+            cvCtx.fillText(`MODEL: YOLOv8n-People [CPU COMPATIBLE]`, 15, cvCanvas.height - 11);
+            cvCtx.fillText(`INGEST NODE: http://localhost:8000/events/ingest`, cvCanvas.width - 290, cvCanvas.height - 11);
+            
+            updateInteractiveFloorMap();
+            requestAnimationFrame(cvAnimationLoop);
+        }
+
+        function drawObjectBox(v) {
+            cvCtx.strokeStyle = v.color;
+            cvCtx.lineWidth = 2;
+            cvCtx.strokeRect(v.x, v.y, v.w, v.h);
+            
+            cvCtx.fillStyle = v.color + '1a';
+            cvCtx.fillRect(v.x, v.y, v.w, v.h);
+            
+            cvCtx.fillStyle = v.color;
+            cvCtx.fillRect(v.x - 1, v.y - 15, v.w + 2, 16);
+            
+            cvCtx.fillStyle = '#080a10';
+            cvCtx.font = 'bold 9px monospace';
+            cvCtx.fillText(`${v.id} (${Math.round(v.conf*100)}%)`, v.x + 3, v.y - 4);
+            
+            cvCtx.fillStyle = v.color;
+            cvCtx.beginPath();
+            cvCtx.arc(v.x + v.w/2, v.y + v.h, 4, 0, Math.PI*2);
+            cvCtx.fill();
+        }
+
+        function updateInteractiveFloorMap() {
+            const mapContainer = document.getElementById('floor-map');
+            if (!mapContainer) return;
+            
+            const dots = mapContainer.querySelectorAll('.visitor-dot');
+            dots.forEach(d => d.remove());
+            
+            const skindex = document.getElementById('map-zone-skindex');
+            const hairdex = document.getElementById('map-zone-hairdex');
+            const billingdex = document.getElementById('map-zone-billingdex');
+            
+            if (skindex) skindex.classList.remove('active');
+            if (hairdex) hairdex.classList.remove('active');
+            if (billingdex) billingdex.classList.remove('active');
+            
+            visualizerVisitors.forEach(v => {
+                const dot = document.createElement('div');
+                dot.className = `visitor-dot ${v.is_staff ? 'staff' : ''}`;
+                dot.setAttribute('data-id', v.id);
+                
+                let pctX = 50;
+                let pctY = 50;
+                
+                if (activeCamera === 'ENTRY') {
+                    pctX = 10 + (v.x / cvCanvas.width) * 20;
+                    pctY = 10 + (v.y / cvCanvas.height) * 40;
+                } else if (activeCamera === 'MAIN') {
+                    pctX = 35 + (v.x / cvCanvas.width) * 55;
+                    pctY = 10 + (v.y / cvCanvas.height) * 80;
+                    
+                    if (v.current_zone === 'SKINCARE' && skindex) skindex.classList.add('active');
+                    if (v.current_zone === 'HAIRCARE' && hairdex) hairdex.classList.add('active');
+                } else if (activeCamera === 'BILL') {
+                    pctX = 15 + (v.x / cvCanvas.width) * 40;
+                    pctY = 50 + (v.y / cvCanvas.height) * 40;
+                    if (billingdex) billingdex.classList.add('active');
+                }
+                
+                dot.style.left = `${pctX}%`;
+                dot.style.top = `${pctY}%`;
+                mapContainer.appendChild(dot);
+            });
+        }
+
+        // Start polling on load
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchData();
+            startCountdownTimer();
+            initCVVisualizer();
+        });
+
+        function startCountdownTimer() {
+            if (refreshTimerInterval) clearInterval(refreshTimerInterval);
+            countdown = 5;
+            const timerEl = document.getElementById("refresh-timer");
+            refreshTimerInterval = setInterval(() => {
+                countdown--;
+                if (countdown <= 0) {
+                    countdown = 5;
+                    fetchData();
+                }
+                timerEl.textContent = `Next update in ${countdown}s`;
+            }, 1000);
+        }
+
+        function changeStore() {
+            selectedStore = document.getElementById("store-selector").value;
+            showLoadingSkeletons();
+            fetchData();
+            startCountdownTimer();
+            showToast(`Switched store layout to ${selectedStore}`);
+        }
+
+        function showLoadingSkeletons() {
+            const elements = ["kpi-visitors", "kpi-conversion", "kpi-dwell", "kpi-queue"];
+            elements.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.add("skeleton");
+            });
+            document.getElementById("zone-grid").innerHTML = `
+                <div class="skeleton" style="height: 50px; margin-bottom: 10px; border-radius: 12px;"></div>
+                <div class="skeleton" style="height: 50px; margin-bottom: 10px; border-radius: 12px;"></div>
+                <div class="skeleton" style="height: 50px; border-radius: 12px;"></div>
+            `;
+        }
+
+        function hideLoadingSkeletons() {
+            const elements = ["kpi-visitors", "kpi-conversion", "kpi-dwell", "kpi-queue"];
+            elements.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove("skeleton");
+            });
+        }
+
+        async function fetchData() {
+            const host = window.location.origin; // Dynamically resolve API URL
+            
+            try {
+                // Parallel fetching for high performance
+                const [metricsRes, funnelRes, heatmapRes, anomaliesRes, healthRes] = await Promise.all([
+                    fetch(`${host}/stores/${selectedStore}/metrics`).then(r => r.ok ? r.json() : null),
+                    fetch(`${host}/stores/${selectedStore}/funnel`).then(r => r.ok ? r.json() : null),
+                    fetch(`${host}/stores/${selectedStore}/heatmap`).then(r => r.ok ? r.json() : null),
+                    fetch(`${host}/stores/${selectedStore}/anomalies`).then(r => r.ok ? r.json() : null),
+                    fetch(`${host}/health`).then(r => r.ok ? r.json() : null)
+                ]);
+
+                // Update health connection status visual
+                const connStatus = document.getElementById("connection-status");
+                const connText = document.getElementById("connection-text");
+                connStatus.classList.remove("offline");
+                connText.textContent = "Live Ingestion Online";
+
+                hideLoadingSkeletons();
+
+                // 1. Render Metrics
+                if (metricsRes) {
+                    document.getElementById("kpi-visitors").textContent = metricsRes.unique_visitors;
+                    document.getElementById("kpi-conversion").textContent = `${(metricsRes.conversion_rate * 100).toFixed(1)}%`;
+                    
+                    // Format Dwell Time - calculate average across all zones
+                    const dwells = Object.values(metricsRes.avg_dwell_by_zone || {});
+                    const avgDwellMs = dwells.length > 0 ? (dwells.reduce((a, b) => a + b, 0) / dwells.length) : 0;
+                    const dwellSecs = avgDwellMs / 1000;
+                    const dwellFormatted = dwellSecs >= 60 
+                        ? `${Math.floor(dwellSecs/60)}m ${Math.round(dwellSecs%60)}s`
+                        : `${Math.round(dwellSecs)}s`;
+                    document.getElementById("kpi-dwell").textContent = dwellFormatted;
+                    
+                    document.getElementById("kpi-queue").textContent = metricsRes.queue_depth;
+                    document.getElementById("kpi-abandonment").innerHTML = `
+                        <i data-lucide="alert-circle" style="width: 12px; height: 12px; display: inline; vertical-align: middle;"></i> 
+                        ${(metricsRes.queue_abandonment_rate * 100).toFixed(1)}% abandonment
+                    `;
+                    
+                    // Dynamic subtitle helper
+                    document.getElementById("kpi-conversion-subtext").textContent = `Active funnel conversion index`;
+                }
+
+                // 2. Render Funnel Chart (Chart.js Integration)
+                if (funnelRes) {
+                    renderFunnelChart(funnelRes);
+                }
+
+                // 3. Render Zone Heatmap
+                if (heatmapRes) {
+                    renderZoneHeatmap(heatmapRes.zones || []);
+                }
+
+                // 4. Render Anomalies Feed
+                if (anomaliesRes) {
+                    renderAnomalies(anomaliesRes);
+                }
+
+                // 5. Render Health Panel
+                if (healthRes) {
+                    document.getElementById("health-db").textContent = healthRes.database;
+                    document.getElementById("health-status").textContent = healthRes.status;
+                    document.getElementById("health-time").textContent = healthRes.timestamp.replace("T", " ").replace("Z", "");
+                    
+                    // Show feed count
+                    const storeFeedCount = Object.keys(healthRes.stores || {}).length;
+                    document.getElementById("health-feeds").textContent = `${storeFeedCount} active stores`;
+                    
+                    if (healthRes.status !== "OK") {
+                        connStatus.classList.add("offline");
+                        connText.textContent = "Feed Lag / Degraded";
+                    }
+                }
+
+                lucide.createIcons();
+
+            } catch (err) {
+                console.error("API error during polling:", err);
+                const connStatus = document.getElementById("connection-status");
+                const connText = document.getElementById("connection-text");
+                connStatus.classList.add("offline");
+                connText.textContent = "API Server Offline";
+                
+                // Show mock/empty values if server offline
+                document.getElementById("kpi-visitors").textContent = "N/A";
+                document.getElementById("kpi-conversion").textContent = "N/A";
+                document.getElementById("kpi-dwell").textContent = "N/A";
+                document.getElementById("kpi-queue").textContent = "N/A";
+            }
+        }
+
+        function renderFunnelChart(funnelData) {
+            const ctx = document.getElementById('funnelChart').getContext('2d');
+            
+            const stages = funnelData.funnel || [];
+            const labels = stages.map(s => s.stage);
+            const counts = stages.map(s => s.count);
+            
+            // Calculate absolute conversion rates relative to first stage (Entry)
+            const entryCount = counts[0] || 1;
+            const rates = counts.map(c => (c / entryCount) * 100);
+
+            if (funnelChartInstance) {
+                funnelChartInstance.data.labels = labels;
+                funnelChartInstance.data.datasets[0].data = counts;
+                funnelChartInstance.data.datasets[0].rates = rates;
+                funnelChartInstance.update();
+                return;
+            }
+
+            funnelChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Customers',
+                        data: counts,
+                        backgroundColor: [
+                            'rgba(108, 92, 231, 0.85)',
+                            'rgba(168, 165, 230, 0.75)',
+                            'rgba(245, 158, 11, 0.75)',
+                            'rgba(16, 185, 129, 0.85)'
+                        ],
+                        borderColor: [
+                            '#6c5ce7',
+                            '#a8a5e6',
+                            '#f59e0b',
+                            '#10b981'
+                        ],
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        barPercentage: 0.55
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    return `Count: ${context.raw} | Conversion: ${rates[index].toFixed(1)}%`;
+                                }
+                            },
+                            backgroundColor: 'rgba(16, 20, 35, 0.95)',
+                            titleFont: { family: 'Outfit', size: 13 },
+                            bodyFont: { family: 'Outfit', size: 12 },
+                            borderColor: 'rgba(255,255,255,0.08)',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { 
+                                color: '#8a99ad',
+                                font: { family: 'Outfit' }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { 
+                                color: '#f1f3f9',
+                                font: { family: 'Outfit', weight: '500' }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderZoneHeatmap(zones) {
+            const container = document.getElementById("zone-grid");
+            
+            if (!zones || zones.length === 0) {
+                container.innerHTML = `<div class="no-anomalies">No zone heatmap tracking data found.</div>`;
+                return;
+            }
+
+            // Sort by visits descending
+            const sortedZones = [...zones].sort((a,b) => b.visit_frequency - a.visit_frequency);
+            const maxVisits = Math.max(...sortedZones.map(z => z.visit_frequency), 1);
+
+            let html = '';
+            sortedZones.forEach(z => {
+                const fillPct = (z.visit_frequency / maxVisits) * 100;
+                
+                // Color mapping depending on zone
+                let colorGradient = 'linear-gradient(90deg, #6c5ce7, #a8a5e6)';
+                if (z.zone_id === 'BILLING') colorGradient = 'linear-gradient(90deg, #10b981, #6ee7b7)';
+                else if (z.visit_frequency > maxVisits * 0.7) colorGradient = 'linear-gradient(90deg, #f43f5e, #fda4af)';
+
+                html += `
+                    <div class="zone-row">
+                        <div class="zone-name">${z.zone_id}</div>
+                        <div class="zone-bar-wrapper">
+                            <div class="zone-bar-bg">
+                                <div class="zone-bar-fill" style="width: ${fillPct}%; background: ${colorGradient};"></div>
+                            </div>
+                        </div>
+                        <div class="zone-stats">
+                            <div class="zone-visits">${z.visit_frequency} vis</div>
+                            <div class="zone-dwell-score">Score: ${Math.round(z.avg_dwell_score)}/100</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderAnomalies(anomalies) {
+            const container = document.getElementById("anomalies-list");
+            
+            if (!anomalies || anomalies.length === 0) {
+                container.innerHTML = `
+                    <div class="no-anomalies">
+                        <i data-lucide="shield-check" style="width: 32px; height: 32px; color: var(--success); opacity: 0.6;"></i>
+                        <p>No active anomalies or warnings detected in this store layout.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            anomalies.forEach(a => {
+                let severityColor = 'CRITICAL';
+                let iconName = 'alert-triangle';
+                
+                if (a.severity === 'WARN' || a.severity === 'WARNING') {
+                    severityColor = 'WARNING';
+                    iconName = 'alert-circle';
+                } else if (a.severity === 'INFO') {
+                    severityColor = 'INFO';
+                    iconName = 'info';
+                }
+
+                // Format timestamp
+                const tsFormatted = a.timestamp ? a.timestamp.split("T")[1].substring(0,8) : "";
+
+                html += `
+                    <div class="anomaly-item ${severityColor}">
+                        <div class="anomaly-icon" style="color: var(--${severityColor === 'CRITICAL' ? 'danger' : severityColor === 'WARNING' ? 'warning' : 'primary'});">
+                            <i data-lucide="${iconName}" style="width: 18px; height: 18px;"></i>
+                        </div>
+                        <div class="anomaly-content">
+                            <div class="anomaly-header-row">
+                                <span class="anomaly-type" style="color: var(--${severityColor === 'CRITICAL' ? 'danger' : severityColor === 'WARNING' ? 'warning' : 'primary'});">
+                                    ${a.anomaly_type.replace(/_/g, " ")}
+                                </span>
+                                <span class="anomaly-time">${tsFormatted}</span>
+                            </div>
+                            <div class="anomaly-desc">${a.message}</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // --- Interactive Modal & Ledger Logics ---
+        function openKpiModal(kpiType) {
+            const modal = document.getElementById('module-modal');
+            const titleText = document.getElementById('modal-title-text');
+            const bodyContent = document.getElementById('modal-body-content');
+            
+            modal.classList.add('show');
+            
+            if (kpiType === 'visitors') {
+                titleText.textContent = "Live Edge AI Visitor Ledger (Cross-Camera Correlated)";
+                bodyContent.innerHTML = `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Centralized Store Roster</strong>: YOLOv8 feeds detect human coordinates, correlate tracking vectors, and classify staff vs customers dynamically.
+                    </div>
+                    <table class="ledger-table">
+                        <thead>
+                            <tr>
+                                <th>VISITOR ID</th>
+                                <th>ROLE</th>
+                                <th>CONF</th>
+                                <th>LAST SEEN CAMERA</th>
+                                <th>ACTIVE PATH</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>VIS_custA01</td>
+                                <td><span class="badge-cust">CUSTOMER</span></td>
+                                <td>96%</td>
+                                <td>CAM_MAIN_02</td>
+                                <td>ENTRY ➔ SKINCARE ➔ BILLING</td>
+                            </tr>
+                            <tr>
+                                <td>VIS_custB02</td>
+                                <td><span class="badge-cust">CUSTOMER</span></td>
+                                <td>94%</td>
+                                <td>CAM_MAIN_02</td>
+                                <td>ENTRY ➔ HAIRCARE ➔ EXIT</td>
+                            </tr>
+                            <tr>
+                                <td>VIS_custC02</td>
+                                <td><span class="badge-cust">CUSTOMER</span></td>
+                                <td>95%</td>
+                                <td>CAM_BILL_02</td>
+                                <td>ENTRY ➔ HAIRCARE ➔ BILLING</td>
+                            </tr>
+                            <tr>
+                                <td>VIS_staff01</td>
+                                <td><span class="badge-staff">STAFF</span></td>
+                                <td>99%</td>
+                                <td>CAM_ENTRY_02</td>
+                                <td>MAIN_FLOOR (EXCLUDED FROM KPIs)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 1.5rem;">
+                        <strong>Neural Attire Embedding Signature (Re-ID Vector Footprint)</strong>:
+                        <div class="vector-grid-box">
+                            <div class="vector-element" style="background: rgba(0,255,102,0.15)">0.34</div>
+                            <div class="vector-element" style="background: rgba(0,255,102,0.25)">0.61</div>
+                            <div class="vector-element" style="background: rgba(0,255,102,0.05)">0.08</div>
+                            <div class="vector-element" style="background: rgba(0,255,102,0.45)">0.92</div>
+                            <div class="vector-element" style="background: rgba(0,255,102,0.30)">0.54</div>
+                            <div class="vector-element" style="background: rgba(0,255,102,0.12)">0.21</div>
+                            <div class="vector-element" style="background: rgba(0,255,102,0.38)">0.77</div>
+                            <div class="vector-element" style="background: rgba(0,255,102,0.20)">0.43</div>
+                        </div>
+                        <span style="font-size: 0.75rem; color: var(--text-secondary);">Real-time feature signatures prevent customer re-entry count inflation.</span>
+                    </div>
+                `;
+            } else if (kpiType === 'conversion') {
+                titleText.textContent = "POS Transaction Time-Correlation Ledger";
+                bodyContent.innerHTML = `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Time-Window POS Attribution Audit</strong>: POS transactions are linked to visitor tracking sessions by matching store IDs and billing entry timestamps within a 5-minute threshold.
+                    </div>
+                    <table class="ledger-table">
+                        <thead>
+                            <tr>
+                                <th>TXN ID</th>
+                                <th>TIMESTAMP</th>
+                                <th>VALUE (INR)</th>
+                                <th>ATTRIBUTED VISITOR</th>
+                                <th>TIME LAG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>TXN_SIM_001</td>
+                                <td>14:07:00</td>
+                                <td>₹1,250.00</td>
+                                <td>VIS_custA01</td>
+                                <td>1.9 minutes (Success)</td>
+                            </tr>
+                            <tr>
+                                <td>TXN_SIM_002</td>
+                                <td>14:16:00</td>
+                                <td>₹680.00</td>
+                                <td>VIS_custC02</td>
+                                <td>1.4 minutes (Success)</td>
+                            </tr>
+                            <tr>
+                                <td>TXN_SIM_003</td>
+                                <td>14:25:50</td>
+                                <td>₹2,100.00</td>
+                                <td>VIS_custD03</td>
+                                <td>1.5 minutes (Success)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 1.5rem; font-size: 0.75rem; color: var(--text-secondary); background: rgba(16, 185, 129, 0.05); padding: 0.75rem; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.15);">
+                        <strong>Attribution Formula</strong>: Conversion matches billing entry triggers to receipts within 300 seconds. Idempotency is strictly enforced by transaction ID.
+                    </div>
+                `;
+            } else if (kpiType === 'dwell') {
+                titleText.textContent = "Zone Attention Breakdown";
+                bodyContent.innerHTML = `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Store Section Engagement Index</strong>: Highlights which product categories draw customer attention but fail to convert.
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 1rem;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
+                                <span>SKINCARE (Moisturizers, Serums)</span>
+                                <span>Dwell Score: 60/100 (Avg 79s)</span>
+                            </div>
+                            <div style="height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow:hidden;">
+                                <div style="width: 60%; height: 100%; background: var(--primary);"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
+                                <span>HAIRCARE (Shampoos, Conditioners)</span>
+                                <span>Dwell Score: 85/100 (Avg 130s)</span>
+                            </div>
+                            <div style="height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow:hidden;">
+                                <div style="width: 85%; height: 100%; background: var(--secondary);"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px;">
+                                <span>BILLING COUNTER AREA</span>
+                                <span>Dwell Score: 95/100 (Avg 132s)</span>
+                            </div>
+                            <div style="height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow:hidden;">
+                                <div style="width: 95%; height: 100%; background: var(--success);"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (kpiType === 'queue') {
+                titleText.textContent = "Checkout Queue & Cashier Dispatcher";
+                bodyContent.innerHTML = `
+                    <div style="margin-bottom: 1rem;">
+                        <strong>Checkout Terminal Allocator</strong>: Real-time billing queue monitoring automatically signals if cashier bottlenecks build up.
+                    </div>
+                    <div style="background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.15); padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="font-weight: bold; color: var(--warning);">QUEUE SPIKE DETECTED</span>
+                            <span style="font-size: 0.75rem; background: rgba(245,158,11,0.2); padding: 2px 6px; border-radius: 4px; color: var(--warning);">STATUS: CRITICAL</span>
+                        </div>
+                        <span style="font-size: 0.8rem;">Current Queue Depth is <strong>2 customers</strong>. Estimated checkout wait time is 4.5 minutes.</span>
+                    </div>
+                    
+                    <strong>Active Cashier Registers (Node Monitor)</strong>:
+                    <table class="ledger-table" style="margin-top: 0.5rem;">
+                        <thead>
+                            <tr>
+                                <th>COUNTER</th>
+                                <th>CASHIER STATUS</th>
+                                <th>CAPACITY LOAD</th>
+                                <th>DISPATCH ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>REGISTER #1</td>
+                                <td><span style="color: var(--success); font-weight: bold;">● ACTIVE</span></td>
+                                <td>90% Load</td>
+                                <td>Locked</td>
+                            </tr>
+                            <tr>
+                                <td>REGISTER #2</td>
+                                <td><span style="color: var(--text-secondary);">● STANDBY (IDLE)</span></td>
+                                <td>0% Load</td>
+                                <td><button onclick="dispatchCashier(2)" style="background: var(--primary); border:none; color:#fff; font-size:0.7rem; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">DISPATCH NOW</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+            }
+            
+            lucide.createIcons();
+        }
+
+        function closeModal() {
+            document.getElementById('module-modal').classList.remove('show');
+        }
+
+        function dispatchCashier(registerNum) {
+            showToast(`DISPATCH ALERT: Cashier Register #${registerNum} has been deployed! Queue depth will dissipate.`);
+            closeModal();
+        }
+
+        // --- Simulated Central Cloud Synchronization Hub Logs ---
+        function runCloudSyncSimulation() {
+            const ticker = document.getElementById('cloud-ticker');
+            if (!ticker) return;
+            
+            const events = [
+                "BigQuery streaming buffer synced 34 records",
+                "Re-ID embeddings hash replicated to Cloud Lakehouse storage",
+                "Ingestion pipeline Brotli compression optimized (ratio 8.5:1)",
+                "Store BLR_002 transaction matrix computed on Central Warehouse",
+                "Operational anomaly BILLING_QUEUE_SPIKE published to on-call Slack",
+                "Health feed heartbeats synched across 5 edge cameras"
+            ];
+            
+            setInterval(() => {
+                const now = new Date();
+                const ts = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
+                const logMsg = events[Math.floor(Math.random() * events.length)];
+                
+                const logDiv = document.createElement('div');
+                logDiv.style.color = '#00b0ff';
+                logDiv.innerHTML = `<span style="color: var(--text-secondary);">[${ts}]</span> ${logMsg}`;
+                
+                ticker.appendChild(logDiv);
+                
+                while (ticker.childNodes.length > 5) {
+                    ticker.removeChild(ticker.firstChild);
+                }
+                
+                ticker.scrollTop = ticker.scrollHeight;
+            }, 3500);
+        }
+
+        // Auto-run cloud simulations when canvas visualizer initiates
+        setTimeout(() => {
+            runCloudSyncSimulation();
+        }, 1000);
+        
+        function showToast(message) {
+            const container = document.getElementById("toast-container");
+            const toast = document.createElement("div");
+            toast.className = "toast";
+            toast.innerHTML = `
+                <i data-lucide="info" style="width: 16px; height: 16px; color: var(--primary);"></i>
+                <span>${message}</span>
+            `;
+            container.appendChild(toast);
+            lucide.createIcons();
+
+            // Trigger animation
+            setTimeout(() => toast.classList.add("show"), 50);
+
+            // Destroy toast after 4s
+            setTimeout(() => {
+                toast.classList.remove("show");
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
