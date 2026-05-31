@@ -28,3 +28,6 @@ Thumbs.db
 dashboard/assets/cctv/*.mp4
 dashboard/assets/cctv/*.webm
 dashboard/assets/cctv/_extracted/
+events/*.jsonl
+dashboard-ui/node_modules/
+dashboard-ui/dist/

@@ -44,25 +44,39 @@ store-intelligence/
 
 ---
 
-## 2. Quick Start: Running with Docker Compose (Recommended)
+## 2. Quick Start: Docker Compose (API + React Dashboard)
 
-To run the entire suite—FastAPI, SQLite, the Live Dashboard, and persistent storage—with a single command:
+Runs **API on port 8000** and **React dashboard on port 3000**:
 
-1. **Start the containers**:
-   ```bash
-   docker-compose up --build -d
-   ```
-2. **Access the Dashboard**:
-   Open a browser and navigate to: **[http://localhost:8000/](http://localhost:8000/)**
-3. **Feed Simulated Data**:
-   With the container running, trigger the simulated batch pipeline to seed the SQLite database:
-   ```bash
-   docker exec -it store_intelligence_api python -m pipeline.emit_simulated --mode batch
-   ```
-4. **Inspect Logs**:
-   ```bash
-   docker-compose logs -f
-   ```
+```bash
+docker compose up --build -d
+```
+
+| Service | URL |
+|---------|-----|
+| **React dashboard** | http://localhost:3000 |
+| **API + Swagger** | http://localhost:8000/docs |
+| **Legacy HTML dashboard** (CCTV overlays, face-api) | http://localhost:8000/ |
+
+**Seed analytics (simulation — all edge cases):**
+```bash
+docker exec -it store_intelligence_api python -m pipeline.emit_simulated --mode batch
+```
+
+**YOLO on 5 local MP4s (full CV pipeline):**
+```bash
+# Host (with venv + ultralytics):
+python scripts/run_yolo_five_cameras.py --frame-stride 4
+
+# Or Docker pipeline profile (GPU/CPU heavy):
+docker compose --profile pipeline up pipeline
+```
+
+**React dev (without Docker):**
+```bash
+cd dashboard-ui && npm install && npm run dev
+# API must run on :8000 — Vite proxies /api → :8000
+```
 
 ---
 

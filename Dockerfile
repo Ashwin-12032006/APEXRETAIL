@@ -41,5 +41,9 @@ COPY dashboard/ ./dashboard/
 # Expose port
 EXPOSE 8000
 
+# Health check helper
+RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Run FastAPI app with Uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

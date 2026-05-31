@@ -1,115 +1,80 @@
-# DESIGN.md - Apex Retail Store Intelligence Architecture
+# DESIGN.md — Purplle / Apex Store Intelligence Architecture
 
-This document describes the high-level architecture, pipeline processing stages, and core engineering decisions behind the **Apex Retail Store Intelligence** system.
+**North star metric:** Offline Store Conversion Rate = Customers who purchased ÷ Total unique visitors (staff excluded).
 
 ---
 
-## 1. System Overview
+## 1. System overview
 
-The Store Intelligence system translates raw CCTV camera feeds into actionable business intelligence (Unique Visitors, Zone Heatmaps, Dwell Times, Billing Queue depths, and Conversion Rates) in real-time. It consists of three decoupled layers:
+Raw CCTV → structured events → REST API → live dashboard.
 
-```mermaid
-graph TD
-    subgraph Edge Video Pipeline
-        V[CCTV Cameras] --> DP[VideoProcessor - YOLOv8]
-        DP --> TR[StoreTracker - Re-ID & Dwell]
-        TR --> EM[Event Batch Emitter]
-    end
-
-    subgraph Analytics API Backend
-        EM -->|HTTP POST /events/ingest| IN[Ingest Route]
-        IN -->|Write / Flatten| DB[(SQLite Database)]
-        
-        MT[Metrics Route] -->|Query| DB
-        FN[Funnel Route] -->|Query| DB
-        HM[Heatmap Route] -->|Query| DB
-        AN[Anomaly Route] -->|Query| DB
-        HL[Health Route] -->|Query| DB
-    end
-
-    subgraph Presentation Layer
-        UI[Live Dashboard UI] -->|REST API Polling| MT
-        UI -->|REST API Polling| FN
-        UI -->|REST API Polling| HM
-        UI -->|REST API Polling| AN
-        UI -->|REST API Polling| HL
-    end
+```
+CCTV Video → YOLOv8 detect → ByteTrack → Staff/Zone classify → Events → API → Dashboard
 ```
 
----
+| Stage | Module | Role |
+|-------|--------|------|
+| 1 | `pipeline/detect.py` | Person detection (YOLOv8n, conf ≥ 0.35) |
+| 2 | `pipeline/byte_tracker.py` | Multi-object tracking (two-stage IoU match) |
+| 3 | `pipeline/staff_detector.py` | Black coat / uniform HSV on torso ROI |
+| 4 | `pipeline/zone_classifier.py` | Polygon or heuristic zone mapping |
+| 5 | `pipeline/tracker.py` | Session events (ENTRY, dwell, queue, REENTRY) |
+| 6 | `pipeline/emit.py` | JSONL + batch POST `/events/ingest` |
+| 7 | `app/*` | Metrics, funnel, heatmap, anomalies, health |
+| 8 | `dashboard/index.html` | Live CCTV + analytics UI |
 
-## 2. Ingestion Pipeline & Event Model
-
-The system operates on an **event-driven model**. As objects are tracked across cameras, events are emitted to the `/events/ingest` bulk endpoint.
-
-### Core Event Schema
-Each event represents a high-confidence visual track state:
-- `event_id`: Unique UUID v4.
-- `store_id`: Associated retail store (e.g. `STORE_BLR_002`).
-- `camera_id`: Source camera (e.g. `CAM_ENTRY_01`, `CAM_MAIN_02`).
-- `visitor_id`: Unified customer tracking ID (e.g. `VIS_c4b12a`).
-- `event_type`: State action:
-  - `ENTRY`: Customer crossed the entrance threshold.
-  - `EXIT`: Customer crossed the exit threshold.
-  - `ZONE_ENTER`: Customer walked into a monitored area (e.g., `SKINCARE`).
-  - `ZONE_EXIT`: Customer left a monitored area.
-  - `ZONE_DWELL`: Periodic heartbeat while staying inside a zone.
-  - `BILLING_QUEUE_JOIN`: Customer joined the check-out queue.
-  - `REENTRY`: Customer exited and walked back in within a brief period.
-- `timestamp`: UTC ISO-8601 string.
-- `dwell_ms`: Milliseconds spent in the previous state (primarily for exit/dwell events).
-- `is_staff`: Flag designating whether the individual is store staff.
+**Fallback:** `pipeline/emit_simulated.py` seeds all edge-case scenarios when GPU/OpenCV unavailable.
 
 ---
 
-## 3. Computer Vision & Tracker Logic
+## 2. Event model
 
-The `pipeline/` package handles detection and object tracking:
-1. **Detection (`detect.py`)**: Uses a **YOLOv8** model fine-tuned for human detection. Runs in real-time or gracefully degrades to simulation if hardware/packages are missing.
-2. **Object Correlation & Re-ID (`tracker.py`)**: 
-   - Tracks are maintained per-camera using bounding box overlap (IoU).
-   - **Cross-Camera & Intertemporal Re-ID**: When a customer disappears from one camera and appears on another, or exits and re-enters, the tracker runs a proximity Re-ID.
-   - **Re-ID Rules**:
-     - *Window*: Within **60 seconds**.
-     - *Spatial Distance*: Within **150 pixels** threshold from the last recorded boundary coordinates.
-     - Re-ID matches maintain the same `visitor_id`, preventing session duplication.
-
----
-
-## 4. Key Metrics Calculation
-
-Analytics APIs dynamically query the SQLite store to compute crucial retail indicators:
-
-### Unique Visitors
-Counts distinct `visitor_id` records that have an `ENTRY` event but excludes staff members (`is_staff = 0`).
-
-### Conversion Rate
-Calculates the ratio of buying visitors to total visitors:
-- **Conversion Criterion**: A visitor is converted if they have a `ZONE_ENTER` event at the `BILLING` zone, and a POS transaction is recorded at the same `store_id` within a **5-minute window** of that billing entry.
-- Formula: $\text{Conversion Rate} = \frac{\text{Unique Converted Visitors}}{\text{Unique Visitors}}$
-
-### Avg Dwell Time by Zone
-Queries `ZONE_EXIT` and `ZONE_DWELL` events to calculate the average milliseconds spent per zone.
-
-### Queue Depth & Abandonment
-- **Queue Depth**: Number of active individuals currently in the `BILLING` zone (joined queue but have not yet exited).
-- **Abandonment Rate**: Percentage of customers who entered the `BILLING` queue but exited the store layout *without* a corresponding POS transaction.
+| Field | Purpose |
+|-------|---------|
+| `event_id` | UUID v4 — idempotent ingest |
+| `visitor_id` | Stable session token (`VIS_*`) |
+| `event_type` | ENTRY, EXIT, REENTRY, ZONE_*, BILLING_QUEUE_JOIN |
+| `dwell_ms` | Integer milliseconds (not float seconds) |
+| `is_staff` | Excluded from conversion funnel & KPIs |
+| `metadata.session_seq` | Reconstruct visitor timeline |
 
 ---
 
-## 5. Anomaly Detection Algorithms
+## 3. Edge case handling
 
-The backend runs real-time heuristics to spot inefficiencies:
-- **Billing Queue Spikes**: Alert triggered if `queue_depth > 5` inside a store (Severity: `WARNING` / `CRITICAL`).
-- **Dead Zone Detection**: Alert triggered if a zone has 0 visits over a configured window (e.g., 20 minutes) despite active store traffic.
-- **Conversion Drops**: Alert triggered if the conversion rate falls below `15%` under high footfall conditions.
+| Edge case | Strategy |
+|-----------|----------|
+| **Group entry (2–4 people)** | Separate ByteTrack ID per bbox — no merging |
+| **Staff movement** | HSV uniform on torso; `is_staff=True`; filtered in API queries |
+| **Re-entry (exit + return)** | 5-min window + 150px spatial Re-ID; `REENTRY` event |
+| **Partial occlusion** | ByteTrack stage-2 low-conf (0.1–0.35) recovery |
+| **Empty store** | No events → API returns zeros, not 500 |
+| **Billing queue** | `BILLING_QUEUE_JOIN` + `queue_depth`; anomaly on spike |
+| **Camera overlap** | Same `visitor_id` via Re-ID registry across cameras |
+
+Simulation coverage: `emit_simulated.py` explicitly models staff, groups, re-entry, queue abandonment, occlusion, empty periods, and cross-camera overlap.
 
 ---
 
-## 6. Live Dashboard Design
+## 4. Key metrics
 
-The presentation layer is built as a single-page reactive application:
-- **Glassmorphic Grid Layout**: Sleek dark theme that matches modern executive command dashboards.
-- **Real-Time Polling**: Automatic polling of FastAPI analytics routes every 5 seconds.
-- **Chart.js Visualizations**: Displays a horizontal multi-stage conversion funnel and progress bar zone visit heatmaps.
-- **Dynamic Updates**: Interactive store layouts can be toggled on-the-fly, smoothly updating UI states.
+- **Conversion:** Billing zone visit + POS txn within 5 minutes
+- **Funnel:** Entry → Zone Visit → Billing Queue → Purchase (drop-off %)
+- **Heatmap:** Unique visitors per zone + normalized dwell score (0–100)
+- **Anomalies:** Queue spike, dead zone, conversion drop
+- **Health:** DB status, per-store feed lag, stale camera alerts
+
+---
+
+## 5. Production notes
+
+- **Idempotency:** `event_id` primary key; duplicate ingest skipped
+- **Graceful degradation:** DB lock → 503 structured JSON; CV missing → simulation
+- **Scale bottleneck:** At ~40 live stores, SQLite write throughput — upgrade via `DATABASE_URL=postgresql://...`
+- **Run pipeline:** `bash pipeline/run.sh clips ./clips` or `bash pipeline/run.sh simulate`
+
+---
+
+## 6. Dashboard
+
+Single-page app at `http://localhost:8000/` — 5-camera CCTV, face/staff detection overlay, funnel chart, zone heatmap, floor map. Polls API every 5s; dashboard also pushes CCTV footfall to `/events/ingest` for live analytics.

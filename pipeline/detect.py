@@ -1,155 +1,216 @@
-import os
-import json
+import argparse
+import logging
 import sys
-from typing import Dict, List, Tuple, Any
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import List, Optional, Set
 
-# Graceful packages check
 try:
     import cv2
-    import ultralytics
+    import numpy as np
     from ultralytics import YOLO
-    OPENCV_YOLO_AVAILABLE = True
-except ImportError:
-    OPENCV_YOLO_AVAILABLE = False
 
+    CV_AVAILABLE = True
+except ImportError:
+    CV_AVAILABLE = False
+
+from pipeline.byte_tracker import ByteTracker
+from pipeline.emit import EventEmitter, emit_event_batch
+from pipeline.staff_detector import StaffDetector
 from pipeline.tracker import StoreTracker
-from pipeline.emit import emit_event_batch
+from pipeline.zone_classifier import ZoneClassifier
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("detect")
+
+CONF_HIGH = 0.35  # challenge: degrade gracefully, don't drop low-conf silently
+
 
 class VideoProcessor:
-    def __init__(self, store_id: str, layout_path: str):
+    """YOLOv8 + ByteTrack + staff/zone classifiers → structured events."""
+
+    def __init__(
+        self,
+        store_id: str,
+        camera_id: str,
+        layout_path: str,
+        output_path: Optional[str] = None,
+        api_url: Optional[str] = None,
+    ):
         self.store_id = store_id
-        self.tracker = StoreTracker(store_id)
-        self.zones_polygons = self.load_zones_polygons(layout_path)
+        self.camera_id = camera_id
+        self.store_tracker = StoreTracker(store_id)
+        self.byte_tracker = ByteTracker(high_thresh=0.5, low_thresh=0.1, match_thresh=0.75)
+        self.staff_detector = StaffDetector()
+        self.zone_classifier = ZoneClassifier.from_layout_file(layout_path, store_id, camera_id)
+        self.emitter = None
+        if output_path:
+            self.emitter = EventEmitter(store_id, camera_id, Path(output_path), api_url=api_url)
+        self._seen_tracks: Set[int] = set()
+        self._exited_visitors: Set[str] = set()
 
-    def load_zones_polygons(self, layout_path: str) -> Dict[str, Any]:
-        # Polygons representing coordinate zones on screen.
-        # In a production environment, these are set via a calibration tool.
-        # Here we mock default coordinates for camera coverage layout.
-        return {
-            "ENTRY_EXIT": [(0, 800), (1920, 1080)], # Bottom portion of entry camera
-            "SKINCARE": [(100, 100), (900, 800)],
-            "HAIRCARE": [(1000, 100), (1800, 800)],
-            "BILLING": [(200, 200), (1700, 900)]
-        }
+    def process_video(
+        self,
+        video_path: str,
+        start_timestamp: Optional[str] = None,
+        frame_stride: int = 2,
+    ):
+        if not CV_AVAILABLE:
+            logger.error("OpenCV/Ultralytics not installed. Use: pip install opencv-python-headless ultralytics")
+            logger.error("Fallback: python -m pipeline.emit_simulated --mode batch")
+            return 1
 
-    def determine_zone(self, box: Tuple[float, float, float, float], camera_id: str) -> str:
-        # Determine which zone the bounding box falls in based on camera ID
-        x_center = (box[0] + box[2]) / 2.0
-        y_center = (box[1] + box[3]) / 2.0
-        
-        if "ENTRY" in camera_id:
-            # Entry camera maps to ENTRY_EXIT or ENTRY threshold
-            if y_center > 700:
-                return "ENTRY_EXIT"
-            return None
-        elif "MAIN" in camera_id:
-            # Main camera covers Skincare, Haircare, etc.
-            if x_center < 960:
-                return "SKINCARE"
-            return "HAIRCARE"
-        elif "BILL" in camera_id:
-            # Billing camera covers Billing counter
-            return "BILLING"
-        return None
-
-    def process_video(self, video_path: str, camera_id: str, start_timestamp: str):
-        if not OPENCV_YOLO_AVAILABLE:
-            print("WARNING: OpenCV or Ultralytics YOLOv8 packages are not installed.", file=sys.stderr)
-            print("Please use 'pipeline/emit_simulated.py' to feed simulated retail streams into the API.", file=sys.stderr)
-            return
-
-        print(f"Loading YOLOv8 model...")
-        model = YOLO("yolov8n.pt") # Uses lightweight Nano model for performance
-        
-        print(f"Opening video clip: {video_path}")
+        model = YOLO("yolov8n.pt")
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            print(f"ERROR: Could not open video file: {video_path}", file=sys.stderr)
-            return
+            logger.error("Cannot open video: %s", video_path)
+            return 1
 
         fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
+        fw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 1920)
+        fh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 1080)
+        base_time = self._parse_ts(start_timestamp)
         frame_count = 0
+        batch_events: List[dict] = []
 
-        # Parse start_timestamp
-        from pipeline.tracker import datetime_from_str
-        from datetime import timedelta
-        base_time = datetime_from_str(start_timestamp)
+        logger.info("Processing %s (%s) @ %.1f fps", video_path, self.camera_id, fps)
 
-        print("Processing frames...")
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
-            
             frame_count += 1
-            # Run YOLOv8 on class 0 (person)
-            # We process every 3rd frame to optimize compute speeds
-            if frame_count % 3 != 0:
+            if frame_stride > 1 and frame_count % frame_stride != 0:
                 continue
 
-            current_time = base_time + timedelta(seconds=(frame_count / fps))
-            current_time_str = current_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            current_time = base_time + timedelta(seconds=frame_count / fps)
+            ts_str = current_time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            # Run detection
             results = model(frame, classes=[0], verbose=False)
-            
-            # Extract tracks
-            # A real deployment uses YOLO tracker: model.track(frame, persist=True)
-            # Here we extract bounding boxes and use our Tracker for spatial association
-            events_to_emit = []
+            detections = []
             for result in results:
-                boxes = result.boxes
-                for box in boxes:
-                    # Bounding box coordinates
-                    coords = box.xyxy[0].tolist() # [xmin, ymin, xmax, ymax]
+                for box in result.boxes:
                     conf = float(box.conf[0])
-                    
-                    if conf < 0.3: # low-confidence suppression
+                    if conf < 0.1:
                         continue
+                    coords = box.xyxy[0].tolist()
+                    detections.append(coords + [conf])
 
-                    # Mock class check for staff based on bounding box characteristics
-                    is_staff = False
-                    
-                    # Track ID assignment
-                    track_id = int(box.id[0]) if box.id is not None else 1
-                    
-                    zone_id = self.determine_zone(coords, camera_id)
-                    
-                    events = self.tracker.update_track(
-                        track_id=track_id,
-                        box=coords,
-                        camera_id=camera_id,
-                        zone_id=zone_id,
-                        is_staff=is_staff,
-                        timestamp_str=current_time_str
-                    )
-                    events_to_emit.extend(events)
+            tracks = self.byte_tracker.update(detections)
+            active_ids = {t.track_id for t in tracks}
 
-            if events_to_emit:
-                emit_event_batch(events_to_emit)
+            for track in tracks:
+                if track.hits < 2:
+                    continue
+                bbox = track.tlbr.tolist()
+                cx = (bbox[0] + bbox[2]) / 2
+                cy = (bbox[1] + bbox[3]) / 2
+                is_staff, staff_conf = self.staff_detector.classify_with_score(frame, np.array(bbox))
+                zone_id = self.zone_classifier.classify_point(cx, cy, fw, fh)
+                conf = max(track.score, staff_conf if is_staff else track.score)
 
-        # Close active tracks and emit remaining exits
-        end_time_str = (base_time + timedelta(seconds=(frame_count / fps))).strftime("%Y-%m-%dT%H:%M:%SZ")
-        final_events = []
-        for track_id in list(self.tracker.active_tracks.keys()):
-            exits = self.tracker.close_track(track_id, end_time_str)
-            final_events.extend(exits)
-            
-        if final_events:
-            emit_event_batch(final_events)
+                events = self.store_tracker.update_track(
+                    track_id=track.track_id,
+                    box=tuple(bbox),
+                    camera_id=self.camera_id,
+                    zone_id=zone_id,
+                    is_staff=is_staff,
+                    timestamp_str=ts_str,
+                    confidence=conf,
+                )
+                for ev in events:
+                    if ev["event_type"] == "EXIT":
+                        self._exited_visitors.add(ev["visitor_id"])
+                    if ev["event_type"] == "ENTRY" and ev["visitor_id"] in self._exited_visitors:
+                        ev["event_type"] = "REENTRY"
+                    batch_events.extend([ev])
+                self._seen_tracks.add(track.track_id)
+
+            # Close tracks no longer visible
+            for tid in list(self.store_tracker.active_tracks.keys()):
+                if tid not in active_ids:
+                    exits = self.store_tracker.close_track(tid, ts_str)
+                    for ev in exits:
+                        if ev["event_type"] == "EXIT":
+                            self._exited_visitors.add(ev["visitor_id"])
+                    batch_events.extend(exits)
+
+            if batch_events:
+                if self.emitter:
+                    for ev in batch_events:
+                        self._write_via_emitter(ev)
+                else:
+                    emit_event_batch(batch_events)
+                batch_events = []
+
+        end_ts = (base_time + timedelta(seconds=frame_count / fps)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        for tid in list(self.store_tracker.active_tracks.keys()):
+            batch_events.extend(self.store_tracker.close_track(tid, end_ts))
+        if batch_events:
+            if self.emitter:
+                for ev in batch_events:
+                    self._write_via_emitter(ev)
+            else:
+                emit_event_batch(batch_events)
+
+        if self.emitter:
+            self.emitter.flush()
 
         cap.release()
-        print(f"Finished processing video clip. Emitted events.")
+        logger.info("Finished %s — frames=%d", self.camera_id, frame_count)
+        return 0
+
+    def _write_via_emitter(self, ev: dict):
+        from pipeline.emit import EventType
+
+        meta = ev.get("metadata") or {}
+        self.emitter.emit(
+            event_type=EventType(ev["event_type"]),
+            visitor_id=ev["visitor_id"],
+            zone_id=ev.get("zone_id"),
+            timestamp=datetime.fromisoformat(ev["timestamp"].replace("Z", "+00:00")),
+            confidence=ev["confidence"],
+            is_staff=ev["is_staff"],
+            session_seq=meta.get("session_seq", 1),
+            dwell_ms=ev.get("dwell_ms", 0),
+            queue_depth=meta.get("queue_depth"),
+            sku_zone=meta.get("sku_zone"),
+        )
+
+    @staticmethod
+    def _parse_ts(ts: Optional[str]) -> datetime:
+        if not ts:
+            return datetime.now(timezone.utc).replace(tzinfo=None)
+        if ts.endswith("Z"):
+            return datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(tzinfo=None)
+        return datetime.fromisoformat(ts)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Purplle Store Intelligence — YOLOv8 detection pipeline")
+    parser.add_argument("--video", required=True)
+    parser.add_argument("--store-id", required=True)
+    parser.add_argument("--camera-id", required=True)
+    parser.add_argument("--layout", default="data/store_layout.json")
+    parser.add_argument("--output", default=None, help="JSONL output path")
+    parser.add_argument("--api-url", default=None)
+    parser.add_argument("--start-ts", default=None, help="ISO UTC start timestamp for clip")
+    parser.add_argument("--frame-stride", type=int, default=2, help="Process every Nth frame (4-8 faster)")
+    args = parser.parse_args()
+
+    root = Path(__file__).resolve().parent.parent
+    layout = args.layout if Path(args.layout).is_absolute() else str(root / args.layout)
+
+    vp = VideoProcessor(
+        store_id=args.store_id,
+        camera_id=args.camera_id,
+        layout_path=layout,
+        output_path=args.output,
+        api_url=args.api_url,
+    )
+    code = vp.process_video(args.video, args.start_ts, frame_stride=max(1, args.frame_stride))
+    raise SystemExit(code or 0)
+
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Usage: python detect.py <store_id> <camera_id> <video_path> <start_timestamp_iso>")
-    else:
-        store_id = sys.argv[1]
-        camera_id = sys.argv[2]
-        video_path = sys.argv[3]
-        start_ts = sys.argv[4]
-        layout = "d:/APEX RETAIL_KASH/store-intelligence/data/store_layout.json"
-        
-        vp = VideoProcessor(store_id, layout)
-        vp.process_video(video_path, camera_id, start_ts)
+    main()

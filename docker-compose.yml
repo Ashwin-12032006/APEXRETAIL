@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.9"
 
 services:
   api:
@@ -9,9 +9,48 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Map the data folder to persist the SQLite database locally
       - ./data:/app/data
+      - ./dashboard/assets:/app/dashboard/assets
+      - ./events:/app/events
     environment:
       - DATABASE_URL=sqlite:////app/data/store_intelligence.db
-      - API_URL=http://localhost:8000
+      - API_URL=http://api:8000
+      - ENABLE_LIVE_SIMULATOR=false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ./dashboard-ui
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
+    container_name: store_intelligence_dashboard
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional: run YOLO on mounted clips (profile: pipeline)
+  pipeline:
+    profiles: ["pipeline"]
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    volumes:
+      - ./dashboard/assets/cctv:/clips:ro
+      - ./data:/app/data
+      - ./events:/app/events
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["python", "scripts/run_yolo_five_cameras.py", "--api-url", "http://api:8000"]

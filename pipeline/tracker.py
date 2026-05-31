@@ -27,26 +27,21 @@ class StoreTracker:
         return False
 
     def correlate_reid(self, track_id: int, current_box: Tuple[float, float], camera_id: str, is_staff: bool, timestamp_str: str) -> str:
-        # Simple Re-ID: check if there's a recently disappeared visitor (within 30s)
-        # near the same coordinates (e.g. threshold distance 150 pixels)
         now_ts = datetime_from_str(timestamp_str)
-        
         best_visitor_id = None
         min_dist = float('inf')
-        
+
         for vis_id, hist in list(self.reid_registry.items()):
-            # Calculate time difference
             last_seen = datetime_from_str(hist["last_seen"])
             time_diff = (now_ts - last_seen).total_seconds()
-            
-            # Check if disappeared within last 60 seconds (handling re-entry)
-            if 0 < time_diff < 60:
-                # Calculate distance
-                hx, hy = hist["last_box"]
+            # Re-entry / cross-camera: 5-minute window, 150px spatial threshold
+            if 0 < time_diff < 300:
+                hx = hist.get("last_box", 0)
+                hy = hist.get("last_box_y", 0)
+                if isinstance(hx, tuple):
+                    hx, hy = hx
                 cx, cy = current_box
-                dist = ((hx - cx)**2 + (hy - cy)**2)**0.5
-                
-                # Threshold distance of 150 pixels
+                dist = ((float(hx) - cx) ** 2 + (float(hy) - cy) ** 2) ** 0.5
                 if dist < 150.0 and dist < min_dist:
                     min_dist = dist
                     best_visitor_id = vis_id
@@ -73,7 +68,7 @@ class StoreTracker:
             }
             return visitor_id
 
-    def update_track(self, track_id: int, box: Tuple[float, float, float, float], camera_id: str, zone_id: Optional[str], is_staff: bool, timestamp_str: str) -> List[Dict[str, Any]]:
+    def update_track(self, track_id: int, box: Tuple[float, float, float, float], camera_id: str, zone_id: Optional[str], is_staff: bool, timestamp_str: str, confidence: float = 0.9) -> List[Dict[str, Any]]:
         # box: (xmin, ymin, xmax, ymax)
         x_center = (box[0] + box[2]) / 2.0
         y_center = (box[1] + box[3]) / 2.0
@@ -85,12 +80,15 @@ class StoreTracker:
             # New track detected
             visitor_id = self.correlate_reid(track_id, center, camera_id, is_staff, timestamp_str)
             
-            # Check if this is a re-entry event
+            # Re-entry: visitor previously exited and re-appears at entry within 5 min
             is_reentry = False
-            # If the visitor has been seen before on the ENTRY camera and is entering again
-            if visitor_id in self.reid_registry and camera_id.startswith("CAM_ENTRY"):
-                # We check if they previously exited
-                is_reentry = True
+            if visitor_id in self.reid_registry:
+                hist = self.reid_registry[visitor_id]
+                if hist.get("exited") and camera_id.startswith("CAM_ENTRY"):
+                    last_seen = datetime_from_str(hist["last_seen"])
+                    gap = (datetime_from_str(timestamp_str) - last_seen).total_seconds()
+                    if 0 < gap < 300:
+                        is_reentry = True
 
             self.active_tracks[track_id] = {
                 "visitor_id": visitor_id,
@@ -114,7 +112,7 @@ class StoreTracker:
                     zone_id=None,
                     dwell_ms=0,
                     is_staff=is_staff,
-                    confidence=0.9,
+                    confidence=confidence,
                     timestamp=timestamp_str,
                     session_seq=1
                 ))
@@ -128,11 +126,27 @@ class StoreTracker:
                     zone_id=zone_id,
                     dwell_ms=0,
                     is_staff=is_staff,
-                    confidence=0.9,
+                    confidence=confidence,
                     timestamp=timestamp_str,
                     session_seq=2
                 ))
-                self.active_tracks[track_id]["session_seq"] = 2
+                if zone_id == "BILLING":
+                    self.current_queue_depth += 1
+                    emitted_events.append(self.create_event(
+                        event_type="BILLING_QUEUE_JOIN",
+                        visitor_id=visitor_id,
+                        camera_id=camera_id,
+                        zone_id="BILLING",
+                        dwell_ms=0,
+                        is_staff=is_staff,
+                        confidence=confidence,
+                        timestamp=timestamp_str,
+                        session_seq=3,
+                        queue_depth=self.current_queue_depth
+                    ))
+                    self.active_tracks[track_id]["session_seq"] = 3
+                else:
+                    self.active_tracks[track_id]["session_seq"] = 2
         else:
             # Existing track updated
             track = self.active_tracks[track_id]
@@ -154,7 +168,7 @@ class StoreTracker:
                         zone_id=old_zone,
                         dwell_ms=dwell_ms,
                         is_staff=is_staff,
-                        confidence=0.9,
+                        confidence=confidence,
                         timestamp=timestamp_str,
                         session_seq=track["session_seq"] + 1
                     ))
@@ -171,7 +185,7 @@ class StoreTracker:
                         zone_id=zone_id,
                         dwell_ms=0,
                         is_staff=is_staff,
-                        confidence=0.9,
+                        confidence=confidence,
                         timestamp=timestamp_str,
                         session_seq=track["session_seq"] + 1
                     ))
@@ -187,7 +201,7 @@ class StoreTracker:
                             zone_id="BILLING",
                             dwell_ms=0,
                             is_staff=is_staff,
-                            confidence=0.9,
+                            confidence=confidence,
                             timestamp=timestamp_str,
                             session_seq=track["session_seq"] + 1,
                             queue_depth=self.current_queue_depth
@@ -208,7 +222,7 @@ class StoreTracker:
                             zone_id=zone_id,
                             dwell_ms=total_dwell,
                             is_staff=is_staff,
-                            confidence=0.9,
+                            confidence=confidence,
                             timestamp=timestamp_str,
                             session_seq=track["session_seq"] + 1
                         ))
@@ -258,12 +272,14 @@ class StoreTracker:
                     session_seq=track["session_seq"] + 1
                 ))
 
-            # Store in Re-ID registry
+            # Store in Re-ID registry (mark exited for re-entry detection)
             self.reid_registry[visitor_id] = {
                 "last_seen": timestamp_str,
-                "last_box": track["last_box"][:2] if "last_box" in track else (0,0),
+                "last_box": (track["last_box"][0] + track["last_box"][2]) / 2 if "last_box" in track else 0,
+                "last_box_y": (track["last_box"][1] + track["last_box"][3]) / 2 if "last_box" in track else 0,
                 "camera_id": camera_id,
-                "is_staff": is_staff
+                "is_staff": is_staff,
+                "exited": camera_id.startswith("CAM_ENTRY"),
             }
             # Remove from active tracks
             del self.active_tracks[track_id]
