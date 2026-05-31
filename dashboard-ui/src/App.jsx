@@ -79,7 +79,11 @@ export default function App() {
 
         {error && (
           <div className="banner error">
-            <span>API offline — start backend on port 8000</span>
+            <span>
+              {import.meta.env.VITE_API_URL
+                ? 'Cannot reach API — check VITE_API_URL and Vercel Deployment Protection'
+                : 'API URL not set — add VITE_API_URL in Vercel and redeploy the dashboard'}
+            </span>
             <code>{error}</code>
           </div>
         )}
