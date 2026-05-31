@@ -23,9 +23,10 @@ export function isGoogleDriveSource(src) {
 }
 
 /** iframe embed — reliable for public Drive MP4s (video tag often fails). */
-export function driveEmbedUrl(src) {
+export function driveEmbedUrl(src, autoplay = true) {
   const id = googleDriveFileId(src);
-  return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+  if (!id) return null;
+  return `https://drive.google.com/file/d/${id}/preview${autoplay ? '?autoplay=1' : ''}`;
 }
 
 /** Local/API path or direct mp4 URL for HTML5 video. */

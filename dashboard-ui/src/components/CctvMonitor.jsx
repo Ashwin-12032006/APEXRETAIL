@@ -27,8 +27,8 @@ function CctvFeed({ source, className, pip }) {
         title="CCTV feed"
         src={source.driveEmbed}
         className={className}
-        allow="autoplay; fullscreen"
-        loading="lazy"
+        allow="autoplay; fullscreen; encrypted-media"
+        loading={pip ? 'lazy' : 'eager'}
         style={pip ? { pointerEvents: 'none' } : undefined}
       />
     );
@@ -37,12 +37,12 @@ function CctvFeed({ source, className, pip }) {
     <video
       className={className}
       src={source.videoSrc}
-      autoPlay={!pip}
+      autoPlay
       muted
       loop
       playsInline
-      controls={!pip}
-      preload={pip ? 'metadata' : 'auto'}
+      controls={false}
+      preload="auto"
     />
   );
 }

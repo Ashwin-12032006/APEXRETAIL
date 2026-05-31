@@ -698,7 +698,8 @@
         }
 
         .cv-main-video,
-        .cv-pip-video {
+        .cv-pip-video,
+        .cv-drive-iframe {
             position: absolute;
             top: 0;
             left: 0;
@@ -707,6 +708,7 @@
             object-fit: cover;
             z-index: 1;
             background: #020308;
+            border: 0;
         }
 
         #cvCanvas {
@@ -2128,6 +2130,42 @@
             tile.classList.toggle('ready', !!ready);
         }
 
+        function googleDriveFileId(url) {
+            if (!url || typeof url !== 'string') return null;
+            const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+            return m ? m[1] : null;
+        }
+
+        function googleDriveEmbed(url, autoplay) {
+            const id = googleDriveFileId(url);
+            if (!id) return null;
+            return `https://drive.google.com/file/d/${id}/preview` + (autoplay ? '?autoplay=1' : '');
+        }
+
+        function clearDriveEmbed(videoEl) {
+            if (!videoEl || !videoEl.parentElement) return;
+            const iframe = videoEl.parentElement.querySelector('.cv-drive-iframe[data-for="' + videoEl.id + '"]');
+            if (iframe) iframe.remove();
+            videoEl.style.display = '';
+        }
+
+        function mountDriveEmbedForVideo(videoEl, embedUrl, onReady) {
+            if (!videoEl || !videoEl.parentElement) return;
+            videoEl.style.display = 'none';
+            videoEl.removeAttribute('src');
+            let iframe = videoEl.parentElement.querySelector('.cv-drive-iframe[data-for="' + videoEl.id + '"]');
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                iframe.className = 'cv-drive-iframe ' + (videoEl.classList.contains('cv-pip-video') ? 'cv-pip-video' : 'cv-main-video');
+                iframe.setAttribute('data-for', videoEl.id);
+                iframe.setAttribute('title', 'CCTV feed');
+                iframe.allow = 'autoplay; fullscreen';
+                videoEl.parentElement.insertBefore(iframe, videoEl);
+            }
+            iframe.src = embedUrl;
+            iframe.onload = () => { if (onReady) onReady(); };
+        }
+
         function applyVideoSources(videoEl, camType, onReady) {
             if (!videoEl) return;
             const cam = normalizeCam(camType);
@@ -2137,11 +2175,27 @@
 
             function tryNext() {
                 if (idx >= sources.length) {
+                    clearDriveEmbed(videoEl);
                     if (videoEl.id === 'cvMainVideo' && hint) hint.classList.add('visible');
                     markPipState(cam, false);
                     return;
                 }
-                videoEl.src = sources[idx++];
+                const src = sources[idx++];
+                const embed = googleDriveEmbed(src, true);
+                if (embed) {
+                    clearDriveEmbed(videoEl);
+                    mountDriveEmbedForVideo(videoEl, embed, () => {
+                        if (videoEl.id === 'cvMainVideo') {
+                            mainVideoReady = true;
+                            if (hint) hint.classList.remove('visible');
+                        }
+                        markPipState(cam, true);
+                        if (onReady) onReady();
+                    });
+                    return;
+                }
+                clearDriveEmbed(videoEl);
+                videoEl.src = src;
                 videoEl.load();
             }
 
@@ -2802,7 +2856,7 @@
             cvCtx.fillStyle = '#8a99ad';
             cvCtx.font = '9px monospace';
             cvCtx.fillText(`MODEL: YOLOv8n-People [CPU COMPATIBLE]`, 15, cvCanvas.height - 11);
-            cvCtx.fillText(`INGEST NODE: http://localhost:8000/events/ingest`, cvCanvas.width - 290, cvCanvas.height - 11);
+            cvCtx.fillText(`INGEST NODE: ${window.location.origin}/events/ingest`, cvCanvas.width - 290, cvCanvas.height - 11);
             
             updateInteractiveFloorMap();
             requestAnimationFrame(cvAnimationLoop);
