@@ -1,8 +1,8 @@
 {
-  "_comment": "Paste Google Drive share links (Anyone with the link). Redeploy dashboard after editing.",
-  "CAM1": "",
-  "CAM2": "",
-  "CAM3": "",
-  "CAM4": "",
-  "CAM5": ""
+  "_comment": "Google Drive share links — Anyone with the link (Viewer). Redeploy dashboard after edits.",
+  "CAM1": "https://drive.google.com/file/d/1z6qK2164vaomm1-9RJfyyEqeWj9cFOGn/view?usp=drive_link",
+  "CAM2": "https://drive.google.com/file/d/1vwNzH5wR8IN1H_me8l7UXc-UciM5hVJL/view?usp=drive_link",
+  "CAM3": "https://drive.google.com/file/d/1yWZgawwER4Ab0ICk3bVmIP7N-kdy_qHS/view?usp=drive_link",
+  "CAM4": "https://drive.google.com/file/d/1Q9_uFYDJ-u9DZqodu4YWkVUcUmeLM86A/view?usp=sharing",
+  "CAM5": "https://drive.google.com/file/d/1FRcr78s78bx4KczdFuAFMkc1eEBFTtH6/view?usp=drive_link"
 }

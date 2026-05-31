@@ -16,7 +16,7 @@ export function resolveVideoUrl(src) {
   if (!/^https?:\/\//i.test(src)) return assetUrl(src);
   const fileId = src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]
     || src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1];
-  if (fileId) return `https://drive.google.com/uc?export=download&id=${fileId}`;
+  if (fileId) return `https://drive.google.com/uc?export=view&id=${fileId}`;
   return src;
 }
 
