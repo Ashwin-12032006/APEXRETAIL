@@ -2201,6 +2201,10 @@
             iframe.onload = () => { if (onReady) onReady(); };
         }
 
+        function isLocalHost() {
+            return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        }
+
         function applyVideoSources(videoEl, camType, onReady) {
             if (!videoEl) return;
             const cam = normalizeCam(camType);
@@ -2217,7 +2221,7 @@
                 }
                 const src = sources[idx++];
                 const embed = googleDriveEmbed(src, true);
-                if (embed) {
+                if (embed && !isLocalHost()) {
                     clearDriveEmbed(videoEl);
                     mountDriveEmbedForVideo(videoEl, embed, () => {
                         if (videoEl.id === 'cvMainVideo') {
@@ -2235,7 +2239,10 @@
             }
 
             const onSuccess = () => {
-                if (videoEl.id === 'cvMainVideo') setDriveEmbedMode(false);
+                if (videoEl.id === 'cvMainVideo') {
+                    setDriveEmbedMode(false);
+                    useRealFaceDetection = faceModelsReady;
+                }
                 if (videoEl.id === 'cvMainVideo') {
                     mainVideoReady = true;
                     if (hint) hint.classList.remove('visible');

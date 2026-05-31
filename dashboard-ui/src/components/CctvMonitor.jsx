@@ -11,6 +11,11 @@ const CAM_META = [
 ];
 
 function resolveCamSource(external, fallback) {
+  const isLocalDev = typeof window !== 'undefined'
+    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  if (isLocalDev && fallback) {
+    return { raw: fallback, driveEmbed: null, videoSrc: assetUrl(fallback) };
+  }
   const raw = external?.trim() || fallback;
   const driveEmbed = driveEmbedUrl(raw);
   return {
