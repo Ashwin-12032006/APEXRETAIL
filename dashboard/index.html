@@ -3796,9 +3796,10 @@
                     document.getElementById("kpi-dwell").textContent = dwellFormatted;
                     
                     document.getElementById("kpi-queue").textContent = metricsRes.queue_depth;
+                    const abandonRate = metricsRes.queue_abandonment_rate ?? metricsRes.abandonment_rate ?? 0;
                     document.getElementById("kpi-abandonment").innerHTML = `
                         <i data-lucide="alert-circle" style="width: 12px; height: 12px; display: inline; vertical-align: middle;"></i> 
-                        ${(metricsRes.queue_abandonment_rate * 100).toFixed(1)}% abandonment
+                        ${(abandonRate * 100).toFixed(1)}% abandonment
                     `;
                     
                     // Dynamic subtitle helper
@@ -3831,19 +3832,31 @@
                     renderAnomalies(anomaliesRes);
                 }
 
-                // 5. Render Health Panel
+                // 5. Render Health Panel + connection badge (selected store, not global)
                 if (healthRes) {
                     document.getElementById("health-db").textContent = healthRes.database;
                     document.getElementById("health-status").textContent = healthRes.status;
                     document.getElementById("health-time").textContent = healthRes.timestamp.replace("T", " ").replace("Z", "");
                     
-                    // Show feed count
                     const storeFeedCount = Object.keys(healthRes.stores || {}).length;
                     document.getElementById("health-feeds").textContent = `${storeFeedCount} active stores`;
-                    
-                    if (healthRes.status !== "OK") {
+
+                    const storeHealth = healthRes.stores?.[selectedStore];
+                    if (healthRes.database !== "connected") {
                         connStatus.classList.add("offline");
-                        connText.textContent = "Feed Lag / Degraded";
+                        connText.textContent = "Database Offline";
+                    } else if (storeHealth?.status === "STALE_FEED") {
+                        connStatus.classList.add("offline");
+                        connText.textContent = `Feed lag · ${storeHealth.lag_minutes}m (${selectedStore})`;
+                    } else if (storeHealth?.status === "ACTIVE") {
+                        connStatus.classList.remove("offline");
+                        connText.textContent = "Live Ingestion Online";
+                    } else if (healthRes.status !== "OK") {
+                        connStatus.classList.add("offline");
+                        connText.textContent = "Other stores lagging (this store OK)";
+                    } else {
+                        connStatus.classList.remove("offline");
+                        connText.textContent = "Live Ingestion Online";
                     }
                 }
 

@@ -1,7 +1,10 @@
 import { RefreshCw, ChevronDown, MapPin } from 'lucide-react';
 
 export default function Header({ stores, storeId, onStoreChange, health, onRefresh, lastUpdate }) {
-  const online = health?.database === 'connected';
+  const storeHealth = health?.stores?.[storeId];
+  const dbOk = health?.database === 'connected';
+  const storeActive = !storeHealth || storeHealth.status === 'ACTIVE';
+  const online = dbOk && storeActive;
   const timeStr = lastUpdate
     ? lastUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '—';
@@ -28,7 +31,11 @@ export default function Header({ stores, storeId, onStoreChange, health, onRefre
         </div>
         <span className={`live-pill ${online ? 'on' : 'off'}`}>
           <span className="live-dot" />
-          {online ? 'Ingest live' : 'API degraded'}
+          {online
+            ? 'Ingest live'
+            : storeHealth?.status === 'STALE_FEED'
+              ? `Feed lag · ${storeHealth.lag_minutes}m`
+              : 'API degraded'}
         </span>
         <button type="button" className="btn-icon" onClick={onRefresh} title="Refresh">
           <RefreshCw size={18} />
