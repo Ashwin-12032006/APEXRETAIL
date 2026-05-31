@@ -4,7 +4,7 @@
 
 ---
 
-## The problem (in simple words)
+## The problem 
 
 Most stores already have **CCTV cameras** and a **billing system (POS)**. But they don’t talk to each other.
 
