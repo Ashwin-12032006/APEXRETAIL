@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Apex Retail Store Intelligence Dashboard</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,6 +49,15 @@
             user-select: none;
         }
 
+        html {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            overscroll-behavior-x: none;
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
         body {
             background-color: var(--bg-color);
             background-image: 
@@ -59,18 +68,35 @@
             color: var(--text-primary);
             font-family: var(--font-main);
             min-height: 100vh;
+            width: 100%;
+            max-width: 100vw;
             overflow-x: hidden;
+            overscroll-behavior-x: none;
+            touch-action: pan-y;
             padding-bottom: 2rem;
         }
 
         /* Container Layout */
         .dashboard-container {
+            width: 100%;
             max-width: 1440px;
             margin: 0 auto;
             padding: 1.5rem 2rem;
+            overflow-x: hidden;
         }
 
-        /* Glassmorphism Common Style */
+        .dashboard-container > *,
+        .glass-panel,
+        .kpi-grid,
+        .visualizer-grid,
+        .dashboard-grid,
+        .bottom-grid,
+        .panel-body,
+        .chart-container {
+            min-width: 0;
+            max-width: 100%;
+        }
+
         .glass-panel {
             background: var(--surface-color);
             backdrop-filter: blur(16px);
@@ -79,6 +105,7 @@
             border-radius: 16px;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
             transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
         }
 
         .glass-panel:hover {
@@ -89,16 +116,21 @@
         /* Header Styling */
         header {
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
+            gap: 1rem;
             margin-bottom: 2rem;
-            padding: 1.25rem 2rem;
+            padding: 1.25rem 1.5rem;
+            width: 100%;
         }
 
         .brand {
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            min-width: 0;
+            flex: 1 1 220px;
         }
 
         .brand-icon {
@@ -120,6 +152,8 @@
             background: linear-gradient(to right, #ffffff, #dcdde1);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            line-height: 1.2;
+            word-break: break-word;
         }
 
         .brand-text p {
@@ -130,8 +164,12 @@
 
         .header-controls {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 1.5rem;
+            gap: 0.75rem;
+            flex: 1 1 240px;
+            justify-content: flex-end;
+            min-width: 0;
         }
 
         .connection-status {
@@ -187,6 +225,8 @@
             font-family: var(--font-main);
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
             transition: all 0.3s;
+            max-width: 100%;
+            width: min(100%, 280px);
         }
 
         .store-selector:focus {
@@ -230,7 +270,7 @@
         /* KPI Grid Layout */
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -326,8 +366,10 @@
 
         .panel-header {
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
+            gap: 0.65rem;
             padding: 1.25rem 1.5rem;
             border-bottom: 1px solid var(--card-border);
         }
@@ -339,6 +381,12 @@
             align-items: center;
             gap: 0.5rem;
             color: var(--text-primary);
+            min-width: 0;
+            flex: 1 1 180px;
+        }
+
+        .panel-title span {
+            line-height: 1.3;
         }
 
         .panel-body {
@@ -351,6 +399,13 @@
             position: relative;
             height: 320px;
             width: 100%;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        .chart-container canvas {
+            display: block;
+            max-width: 100% !important;
         }
 
         /* Heatmap Grid Visual */
@@ -368,6 +423,8 @@
             border: 1px solid rgba(255, 255, 255, 0.04);
             border-radius: 12px;
             transition: all 0.3s;
+            min-width: 0;
+            max-width: 100%;
         }
 
         .zone-row:hover {
@@ -377,13 +434,15 @@
 
         .zone-name {
             width: 110px;
+            flex-shrink: 0;
             font-weight: 600;
             font-size: 0.9rem;
         }
 
         .zone-bar-wrapper {
-            flex-grow: 1;
-            margin: 0 1.5rem;
+            flex: 1 1 auto;
+            min-width: 0;
+            margin: 0 1rem;
         }
 
         .zone-bar-bg {
@@ -405,6 +464,7 @@
         .zone-stats {
             text-align: right;
             width: 80px;
+            flex-shrink: 0;
         }
 
         .zone-visits {
@@ -626,6 +686,9 @@
             grid-template-columns: 1.2fr 1fr;
             gap: 1.5rem;
             margin-bottom: 2rem;
+            width: 100%;
+            min-width: 0;
+            max-width: 100%;
         }
 
         @media (max-width: 1024px) {
@@ -777,7 +840,10 @@
             background: rgba(255,255,255,0.02);
             border-radius: 12px;
             border: 1px solid var(--card-border);
-            width: fit-content;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .cam-btn {
@@ -840,6 +906,7 @@
             transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
             text-align: center;
             padding: 4px;
+            cursor: pointer;
         }
 
         .floor-zone.active {
@@ -869,6 +936,45 @@
             background: rgba(168, 165, 230, 0.15);
             box-shadow: 0 0 15px rgba(168, 165, 230, 0.2);
             color: #dcdde1;
+        }
+
+        .floor-plan-intro {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .floor-zone--entry {
+            top: 10px;
+            left: 10px;
+            width: 36%;
+            height: 50px;
+        }
+
+        .floor-zone--skincare {
+            top: 10px;
+            right: 10px;
+            width: 44%;
+            height: 38%;
+        }
+
+        .floor-zone--haircare {
+            bottom: 10px;
+            right: 10px;
+            width: 44%;
+            height: 38%;
+        }
+
+        .floor-zone--billing {
+            bottom: 10px;
+            left: 10px;
+            width: 42%;
+            height: 34%;
         }
 
         /* Moving customer dot */
@@ -1198,6 +1304,7 @@
             margin-bottom: 0.75rem;
             font-family: monospace;
             font-size: 0.68rem;
+            max-width: 100%;
         }
 
         .cv-feed-stat {
@@ -1222,9 +1329,7 @@
         }
 
         .camera-selector-bar {
-            flex-wrap: wrap;
-            width: 100%;
-            max-width: 100%;
+            flex-wrap: nowrap;
         }
 
         .cv-pip-tile.loading .cv-pip-video {
@@ -1319,6 +1424,286 @@
 
         .cv-face-sidebar {
             width: 155px;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            body {
+                background-attachment: scroll;
+            }
+
+            .dashboard-container {
+                width: 100%;
+                max-width: 100%;
+                padding: 0.65rem;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.85rem;
+                padding: 1rem;
+                margin-bottom: 1.25rem;
+            }
+
+            .brand {
+                flex: 1 1 auto;
+            }
+
+            .header-controls {
+                flex-direction: column;
+                align-items: stretch;
+                justify-content: flex-start;
+                width: 100%;
+                gap: 0.65rem;
+            }
+
+            .refresh-indicator {
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            .store-selector-wrapper {
+                width: 100%;
+            }
+
+            .store-selector {
+                width: 100%;
+                font-size: 0.85rem;
+            }
+
+            .connection-status {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .brand-text h1 {
+                font-size: 1.15rem;
+            }
+
+            .kpi-grid {
+                grid-template-columns: 1fr;
+                gap: 0.85rem;
+                margin-bottom: 1.25rem;
+            }
+
+            .kpi-card {
+                height: auto;
+                min-height: 120px;
+                padding: 1.15rem;
+            }
+
+            .kpi-value {
+                font-size: 1.65rem;
+            }
+
+            .dashboard-grid,
+            .visualizer-grid,
+            .bottom-grid {
+                gap: 1rem;
+                margin-bottom: 1.25rem;
+            }
+
+            .panel-header {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                padding: 1rem;
+            }
+
+            .panel-title {
+                font-size: 0.92rem;
+            }
+
+            .panel-body {
+                padding: 0.85rem;
+            }
+
+            .zone-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.45rem;
+                padding: 0.85rem;
+            }
+
+            .zone-row:hover {
+                transform: none;
+            }
+
+            .zone-name,
+            .zone-stats {
+                width: auto;
+            }
+
+            .zone-bar-wrapper {
+                margin: 0;
+                width: 100%;
+            }
+
+            .zone-stats {
+                text-align: left;
+            }
+
+            .chart-container {
+                height: 240px;
+            }
+
+            .floor-plan-intro {
+                flex-direction: column;
+            }
+
+            .floor-zone {
+                font-size: 0.62rem;
+            }
+
+            .camera-selector-bar {
+                width: 100%;
+                max-width: 100%;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .cam-btn {
+                flex: 1 0 auto;
+                min-width: 58px;
+                padding: 0.55rem 0.65rem;
+                font-size: 0.72rem;
+            }
+
+            .cv-monitor-box {
+                height: min(56vw, 300px);
+                min-height: 220px;
+            }
+
+            .cv-overlay {
+                font-size: 0.65rem;
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                flex-direction: column;
+                gap: 0.25rem;
+                align-items: flex-start;
+            }
+
+            .cv-face-sidebar {
+                width: 105px;
+                top: 38px;
+                left: 8px;
+                bottom: 32px;
+            }
+
+            .cv-pip-strip {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .cv-pip-tile {
+                height: 68px;
+            }
+
+            .floor-plan-box {
+                height: 260px;
+                padding: 1rem;
+            }
+
+            .toast-container {
+                left: 1rem;
+                right: 1rem;
+                bottom: 1rem;
+            }
+
+            .modal-content {
+                width: 94%;
+                max-height: 90vh;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .modal-body {
+                max-height: none;
+                flex: 1;
+                overflow-y: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .dashboard-container {
+                padding: 0.5rem;
+            }
+
+            header {
+                padding: 0.85rem;
+            }
+
+            .panel-header {
+                padding: 0.85rem;
+            }
+
+            .panel-body {
+                padding: 0.75rem;
+            }
+
+            .chart-container {
+                height: 210px;
+            }
+
+            .header-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .store-selector-wrapper,
+            .store-selector {
+                width: 100%;
+            }
+
+            .connection-status {
+                justify-content: center;
+            }
+
+            .cv-monitor-box {
+                height: 220px;
+                min-height: 200px;
+            }
+
+            .cv-pip-strip {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.4rem;
+            }
+
+            .cv-feed-stats {
+                font-size: 0.62rem;
+            }
+
+            .cv-feed-stat {
+                padding: 0.2rem 0.45rem;
+            }
+        }
+
+        /* Hard lock — no horizontal pan on phones */
+        @media (max-width: 900px) {
+            html, body {
+                overflow-x: clip !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            .dashboard-container,
+            .visualizer-grid,
+            .dashboard-grid,
+            .bottom-grid,
+            .kpi-grid,
+            .glass-panel,
+            .panel-body,
+            .cv-monitor-box,
+            .floor-map-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: clip;
+            }
+
+            img, video, canvas, iframe {
+                max-width: 100% !important;
+            }
         }
     </style>
 </head>
@@ -1512,7 +1897,7 @@
                     </div>
                 </div>
                 <div class="panel-body floor-plan-box">
-                    <div style="font-size: 0.8rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
+                    <div class="floor-plan-intro">
                         <span>CV Re-ID pipeline tracks customers spatial coordinates dynamically. Glowing indicators represent detected individuals.</span>
                         <span id="active-track-indicator" style="display:none; font-weight:bold; color:#ff3b30; font-size:0.75rem;">
                             TRACKING: <span id="tracked-visitor-name"></span> 
@@ -1520,11 +1905,10 @@
                         </span>
                     </div>
                     <div class="floor-map-container" id="floor-map">
-                        <!-- Zones outline -->
-                        <div class="floor-zone entry" onclick="openZoneModal('ENTRY')" style="top: 10px; left: 10px; width: 120px; height: 50px; cursor: pointer;">ENTRY / EXIT</div>
-                        <div class="floor-zone" id="map-zone-skindex" onclick="openZoneModal('SKINCARE')" style="top: 10px; right: 10px; width: 160px; height: 100px; cursor: pointer;">SKINCARE ZONE</div>
-                        <div class="floor-zone" id="map-zone-hairdex" onclick="openZoneModal('HAIRCARE')" style="bottom: 10px; right: 10px; width: 160px; height: 100px; cursor: pointer;">HAIRCARE ZONE</div>
-                        <div class="floor-zone billing" id="map-zone-billingdex" onclick="openZoneModal('BILLING')" style="bottom: 10px; left: 10px; width: 150px; height: 90px; cursor: pointer;">BILLING AREA & QUEUE</div>
+                        <div class="floor-zone entry floor-zone--entry" onclick="openZoneModal('ENTRY')">ENTRY / EXIT</div>
+                        <div class="floor-zone floor-zone--skincare" id="map-zone-skindex" onclick="openZoneModal('SKINCARE')">SKINCARE ZONE</div>
+                        <div class="floor-zone floor-zone--haircare" id="map-zone-hairdex" onclick="openZoneModal('HAIRCARE')">HAIRCARE ZONE</div>
+                        <div class="floor-zone billing floor-zone--billing" id="map-zone-billingdex" onclick="openZoneModal('BILLING')">BILLING AREA &amp; QUEUE</div>
                     </div>
                 </div>
             </div>
@@ -3258,6 +3642,38 @@
             switchCamera('CAM1');
             startCctvAnalyticsIngest();
         });
+
+        function lockViewportWidth() {
+            if (window.scrollX !== 0) {
+                window.scrollTo(0, window.scrollY);
+            }
+        }
+
+        window.addEventListener('scroll', lockViewportWidth, { passive: true });
+        window.addEventListener('resize', () => {
+            lockViewportWidth();
+            if (funnelChartInstance) funnelChartInstance.resize();
+        });
+
+        // Block horizontal finger-drag on mobile (page stays fixed left/right)
+        let touchStartX = 0;
+        let touchStartY = 0;
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                touchStartX = e.touches[0].pageX;
+                touchStartY = e.touches[0].pageY;
+            }
+        }, { passive: true });
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length !== 1) return;
+            const scrollParent = e.target.closest('.anomalies-list, .modal-body, .camera-selector-bar, .cv-face-sidebar');
+            if (scrollParent) return;
+            const dx = Math.abs(e.touches[0].pageX - touchStartX);
+            const dy = Math.abs(e.touches[0].pageY - touchStartY);
+            if (dx > dy && dx > 8) {
+                e.preventDefault();
+            }
+        }, { passive: false });
 
         async function initCVVisualizerAsync() {
             cvCanvas = document.getElementById('cvCanvas');
