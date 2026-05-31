@@ -1,0 +1,13 @@
+[project]
+name = "apexretail"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.100.0",
+    "sqlalchemy>=2.0.0",
+    "pydantic>=2.0",
+    "requests>=2.31.0",
+]
+
+[tool.vercel]
+entrypoint = "app/main.py"
