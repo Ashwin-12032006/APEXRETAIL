@@ -1,3 +1,13 @@
+# PROMPT:
+# Validate staff_detector.py classifies black-coat torso (store uniform) vs colorful
+# customer clothing using HSV on the middle-third ROI; skip suite if OpenCV missing.
+#
+# CHANGES MADE:
+# - Synthetic BGR frames with black torso + lighter face region
+# - assert staff or score threshold for uniform frame
+# - assert not staff for bright casual shirt (control case)
+# - pytest.importorskip("cv2") for environments without OpenCV
+#
 """Staff detector — black coat / uniform HSV."""
 import numpy as np
 import pytest

@@ -1,148 +1,151 @@
-# Apex Retail Store Intelligence System
+# Apex Lens — Store Intelligence
 
-Apex Retail Store Intelligence is a containerized real-time computer vision analytics system designed to process CCTV footage and POS sales transactions, exposing store-level efficiency insights through a REST API and a premium web-based executive dashboard.
+**Apex Lens** turns store CCTV into clear numbers: how many real shoppers came in, where they went, and how many actually bought. Built for offline beauty retail (Purplle-style stores).
 
 ---
 
-## 1. Directory Structure
+## The problem (in simple words)
+
+Most stores already have **CCTV cameras** and a **billing system (POS)**. But they don’t talk to each other.
+
+### What goes wrong today
+
+1. **You can’t see the full shopper journey**  
+   One camera sees the door. Another sees the aisles. Another sees the billing counter. Nobody connects them into one story: *entered → browsed → queued → paid*.
+
+2. **Staff look like customers**  
+   Employees walk the floor all day. If you count every person on camera, your “footfall” is too high and your **conversion rate looks worse than it really is**.
+
+3. **Video doesn’t become KPIs by itself**  
+   Watching five camera feeds doesn’t give you dwell time, queue length, dead zones, or a funnel chart. Someone has to **detect people, track them, and log events**.
+
+4. **Demos often break**  
+   Many student or hackathon projects show a pretty UI with **empty charts** because the database wasn’t seeded, SQLite locked up, or the API wasn’t running. Reviewers can’t judge what you built.
+
+5. **Hard to run for others**  
+   “Install Python, create venv, seed DB, run three terminals…” is fine for you, not for a judge who only has five minutes.
+
+### What stores actually need
+
+One honest number as the **north star**:
+
+**Conversion rate = shoppers who paid ÷ real visitors (staff not counted)**
+
+Plus: zone heatmaps, queue alerts, and live CCTV when you need to verify what the numbers mean.
+
+---
+
+## How our solution fixes this
+
+We built a full path from **camera video → events → API → dashboard**.
+
+```
+CCTV → detect people (YOLO) → track them (ByteTrack) → tag staff & zones → save events → charts
+```
+
+| Problem | What we do |
+|--------|------------|
+| Cameras don’t connect | Same visitor gets events across entry, floor, and billing cameras. |
+| Staff inflate numbers | Black-coat detection sets `is_staff`; APIs ignore staff in funnel and KPIs. |
+| Video ≠ metrics | Pipeline emits `ENTRY`, `ZONE_ENTER`, `BILLING_QUEUE_JOIN`, etc. Dashboard reads live APIs. |
+| Empty / broken demos | DB auto-creates and **seeds sample data** on startup. Docker starts everything with one command. |
+| Hard to reproduce | `docker compose up --build` → API on **8000**, **Apex Lens** UI on **3000**. |
+
+### What makes Apex Lens different
+
+- **Apex Lens UI** — gold + plum “retail command” look, conversion ring, journey rail, staff-aware callout (not a generic purple admin template).
+- **Two dashboards** — React for executives; legacy page on port 8000 for face detection and staff/customer boxes on video.
+- **Real pipeline** — YOLO on your 5 MP4s, simulator for edge cases, pytest, `DESIGN.md` / `CHOICES.md`.
+
+More detail: [DESIGN.md](DESIGN.md) · [CHOICES.md](CHOICES.md)
+
+---
+
+## Quick start (Docker — one command)
+
+**You need:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) running.
+
+```bash
+cd store-intelligence
+docker compose up --build
+```
+
+| What you get | URL |
+|--------------|-----|
+| **Apex Lens dashboard** | http://localhost:3000 |
+| **API docs** | http://localhost:8000/docs |
+| **CV lab (faces + staff on video)** | http://localhost:8000/ |
+
+No `.env` file. No manual seed. Database and sample analytics are created inside the container.
+
+Add `-d` to run in the background.
+
+---
+
+## Quick start (local, no Docker)
+
+**Terminal 1 — API**
+```powershell
+cd store-intelligence
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+**Terminal 2 — Apex Lens UI**
+```powershell
+cd store-intelligence\dashboard-ui
+npm install
+npm run dev
+```
+
+Open http://localhost:3000 (API must be on port 8000).
+
+---
+
+## API (short list)
+
+| Endpoint | What it does |
+|----------|----------------|
+| `POST /events/ingest` | Add camera events (safe to send duplicates) |
+| `GET /stores/{id}/metrics` | Visitors, conversion, dwell, queue |
+| `GET /stores/{id}/funnel` | Entry → browse → billing → purchase |
+| `GET /stores/{id}/heatmap` | Busiest zones |
+| `GET /stores/{id}/anomalies` | Queue spikes, dead zones |
+| `GET /health` | Is the DB up? Are cameras stale? |
+
+---
+
+## Project layout
 
 ```text
 store-intelligence/
-├── app/                      # FastAPI Backend Service
-│   ├── __init__.py           # Package namespace initializer
-│   ├── anomalies.py          # GET /stores/{id}/anomalies route
-│   ├── database.py           # SQLAlchemy SQLite database session setup
-│   ├── funnel.py             # GET /stores/{id}/funnel analysis
-│   ├── health.py             # GET /health node & feed staleness check
-│   ├── heatmap.py            # GET /stores/{id}/heatmap zone occupancy
-│   ├── main.py               # FastAPI core app & structured logging
-│   ├── metrics.py            # GET /stores/{id}/metrics store KPIs
-│   └── models.py             # Pydantic schemas & SQLAlchemy DB models
-│
-├── pipeline/                 # Computer Vision & Simulation Pipeline
-│   ├── __init__.py           # Package namespace initializer
-│   ├── detect.py             # YOLOv8 object detector
-│   ├── emit.py               # Event poster client
-│   ├── emit_simulated.py     # Complex customer behavior simulator
-│   ├── tracker.py            # Re-ID, cross-camera, and dwell tracker
-│   └── run.sh                # Executable pipeline wrapper
-│
-├── data/                     # Data Storage
-│   ├── pos_transactions.csv  # Base POS transactions CSV
-│   ├── store_layout.json     # Configuration defining store layouts & camera placements
-│   └── store_intelligence.db # Initialized SQLite database
-│
-├── dashboard/                # Live Dashboard
-│   └── index.html            # Premium single-page glassmorphism dashboard UI
-│
-├── Dockerfile                # Deployment container blueprint
-├── docker-compose.yml        # Orchestration configuration
-├── requirements.txt          # Python packages list
-├── DESIGN.md                 # Architecture, tracker, and algorithm design spec
-└── CHOICES.md                # Stack decisions and technology trade-offs
+├── app/              FastAPI + SQLite
+├── pipeline/         YOLO, tracking, staff, zones, simulator
+├── dashboard-ui/     Apex Lens (React)
+├── dashboard/        Legacy HTML + CCTV videos
+├── data/             Layout, POS sample, DB (local)
+├── tests/            pytest
+└── docker-compose.yml
 ```
 
 ---
 
-## 2. Quick Start: Docker Compose (API + React Dashboard)
+## Tests
 
-Runs **API on port 8000** and **React dashboard on port 3000**:
-
-```bash
-docker compose up --build -d
-```
-
-| Service | URL |
-|---------|-----|
-| **React dashboard** | http://localhost:3000 |
-| **API + Swagger** | http://localhost:8000/docs |
-| **Legacy HTML dashboard** (CCTV overlays, face-api) | http://localhost:8000/ |
-
-**Seed analytics (simulation — all edge cases):**
-```bash
-docker exec -it store_intelligence_api python -m pipeline.emit_simulated --mode batch
-```
-
-**YOLO on 5 local MP4s (full CV pipeline):**
-```bash
-# Host (with venv + ultralytics):
-python scripts/run_yolo_five_cameras.py --frame-stride 4
-
-# Or Docker pipeline profile (GPU/CPU heavy):
-docker compose --profile pipeline up pipeline
-```
-
-**React dev (without Docker):**
-```bash
-cd dashboard-ui && npm install && npm run dev
-# API must run on :8000 — Vite proxies /api → :8000
+```powershell
+pytest tests/ -v
 ```
 
 ---
 
-## 3. Local Installation & Development Setup
+## Optional: more data
 
-If you prefer to run the application locally without Docker, follow these steps:
-
-### Prerequisite
-- **Python 3.8 to 3.11** installed.
-
-### Step 1: Clone and Set Up Virtual Environment
-On Windows (PowerShell):
 ```powershell
-# Navigate to the workspace
-cd "d:\APEX RETAIL_KASH\store-intelligence"
-
-# Create a virtual environment
-python -m venv venv
-
-# Activate the virtual environment
-.\venv\Scripts\Activate.ps1
-```
-
-### Step 2: Install Dependencies
-```powershell
-pip install -r requirements.txt
-```
-
-### Step 3: Run the FastAPI Server
-Start Uvicorn in development auto-reload mode:
-```powershell
-uvicorn app.main:app --reload --port 8000
-```
-- The backend API is now running at `http://localhost:8000`.
-- The live dashboard is served directly at the root: `http://localhost:8000/`.
-- Interactive API Swagger docs are hosted at `http://localhost:8000/docs`.
-
-### Step 4: Run the Ingestion Pipeline Simulator
-Open a new terminal window (with active virtual env) and execute the ingestion script to feed tracking events:
-```powershell
-# Run the pipeline in batch mode to seed historical events
+# Simulated shoppers (groups, re-entry, queues, staff)
 python -m pipeline.emit_simulated --mode batch
 
-# OR run in real-time stream mode (emits events in real-time wall-clock speed)
-python -m pipeline.emit_simulated --mode stream
+# YOLO on 5 MP4s in dashboard/assets/cctv/
+python scripts/run_yolo_five_cameras.py --frame-stride 8
 ```
-
----
-
-## 4. API Endpoints Map
-
-### Ingestion API
-- `POST /events/ingest` – Ingests a bulk batch of camera event objects. Fully supports duplicate detection and idempotency.
-
-### Analytics APIs
-- `GET /stores/{store_id}/metrics` – High-level KPIs: unique visitors, conversion rate, average dwell time, queue depth, queue abandonment rate.
-- `GET /stores/{store_id}/funnel` – 4-stage customer conversion funnel counts and drop-off percentages.
-- `GET /stores/{store_id}/heatmap` – Store-wide zone visit frequencies and absolute dwell scores.
-- `GET /stores/{store_id}/anomalies` – Identifies real-time bottlenecks (queue depth spikes, dead zones, conversion drops).
-
-### System Health
-- `GET /health` – Verifies SQLite connectivity and flags stale camera feeds if lag exceeds 10 minutes.
-
----
-
-## 5. Structured Logging & Error Handling
-
-- **Structured Logging**: Every API request writes a single JSON log to stdout containing trace IDs, latency, response status, and endpoints, matching production logging standards.
-- **Error Handling**: Graceful database failover via global SQLAlchemy handlers. Returns structured JSON errors (`DATABASE_UNAVAILABLE`) if connection to SQLite is broken.

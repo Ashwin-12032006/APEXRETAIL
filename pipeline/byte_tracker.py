@@ -148,6 +148,7 @@ class ByteTracker:
             unmatched_objs[i].mark_lost()
             self.lost_tracks.append(unmatched_objs[i])
 
+        unmatched_new = list(range(len(unmatched_dets_h)))
         if len(unmatched_dets_h) and len(self.lost_tracks):
             matched_r, _, unmatched_new = self._match(self.lost_tracks, high_dets[unmatched_dets_h])
             for ti, di in matched_r:
@@ -156,7 +157,11 @@ class ByteTracker:
                 self.lost_tracks[ti].state = TrackState.TRACKED
                 refound.append(self.lost_tracks[ti])
 
-        remaining = high_dets[unmatched_dets_h[unmatched_new]] if len(unmatched_new) else []
+        remaining = (
+            high_dets[unmatched_dets_h][unmatched_new]
+            if len(unmatched_new)
+            else np.empty((0, 6), dtype=float)
+        )
         new_tracks = [Track(det.tolist(), float(det[4])) for det in remaining if det[4] >= self.high_thresh]
 
         self.lost_tracks = [

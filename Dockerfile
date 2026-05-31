@@ -35,15 +35,17 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy app code
 COPY app/ ./app/
 COPY pipeline/ ./pipeline/
-COPY data/ ./data/
+COPY data/ ./data-seed/
 COPY dashboard/ ./dashboard/
+COPY scripts/docker-entrypoint.sh /docker-entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
 # Health check helper
 RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && chmod +x /docker-entrypoint.sh
 
-# Run FastAPI app with Uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Zero-setup: create data/events dirs, migrate tables, seed analytics (see app/main.py)
+ENTRYPOINT ["/docker-entrypoint.sh"]

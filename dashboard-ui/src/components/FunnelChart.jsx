@@ -2,7 +2,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
 } from 'recharts';
 
-const STAGE_COLORS = ['#8b5cf6', '#a78bfa', '#f59e0b', '#34d399'];
+const STAGE_COLORS = ['#c9a227', '#9b6ed8', '#e8a54b', '#3dd6c6'];
 
 export default function FunnelChart({ data, loading }) {
   const stages = data?.funnel || [];
@@ -15,7 +15,7 @@ export default function FunnelChart({ data, loading }) {
   }));
 
   return (
-    <section className="glass panel funnel-panel">
+    <section className="glass panel funnel-panel apex-panel">
       <div className="panel-head">
         <div>
           <h2>Conversion funnel</h2>
@@ -30,7 +30,7 @@ export default function FunnelChart({ data, loading }) {
           <BarChart data={chartData} margin={{ top: 24, right: 12, left: 0, bottom: 8 }}>
             <XAxis
               dataKey="short"
-              tick={{ fill: '#94a3b8', fontSize: 11, fontFamily: 'Outfit' }}
+              tick={{ fill: '#a89bb8', fontSize: 11, fontFamily: 'DM Sans' }}
               axisLine={false}
               tickLine={false}
             />

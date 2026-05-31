@@ -1,17 +1,19 @@
-import { BarChart3, Video, ExternalLink, Sparkles } from 'lucide-react';
+import { BarChart3, Video, ExternalLink, ScanEye } from 'lucide-react';
 
 export default function Sidebar({ tab, onTab, legacyUrl }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
         <div className="brand-icon">
-          <Sparkles size={22} strokeWidth={2.2} />
+          <ScanEye size={24} strokeWidth={2} />
         </div>
         <div>
-          <strong>Purplle</strong>
-          <span>Store Intelligence</span>
+          <strong className="brand-name">Apex Lens</strong>
+          <span className="brand-sub">by Apex Retail</span>
         </div>
       </div>
+
+      <p className="sidebar-tagline">CCTV → events → decisions</p>
 
       <nav className="sidebar-nav">
         <button
@@ -20,7 +22,7 @@ export default function Sidebar({ tab, onTab, legacyUrl }) {
           onClick={() => onTab('analytics')}
         >
           <BarChart3 size={18} />
-          Analytics
+          Store pulse
         </button>
         <button
           type="button"
@@ -28,16 +30,16 @@ export default function Sidebar({ tab, onTab, legacyUrl }) {
           onClick={() => onTab('cctv')}
         >
           <Video size={18} />
-          Live CCTV
+          Floor vision
         </button>
       </nav>
 
       <div className="sidebar-foot">
         <a href={legacyUrl} target="_blank" rel="noreferrer" className="legacy-link">
           <ExternalLink size={14} />
-          Advanced CV overlay
+          Open CV lab (face + staff boxes)
         </a>
-        <p className="sidebar-note">Face detection & staff uniforms on port 8000</p>
+        <p className="sidebar-note">Live detection overlay runs on port 8000</p>
       </div>
     </aside>
   );

@@ -1,3 +1,12 @@
+# PROMPT:
+# Confirm zone_classifier.py loads store_layout.json and maps (x,y) to SKINCARE,
+# BILLING, and entry zones via heuristics when polygons are absent; verify SKU map.
+#
+# CHANGES MADE:
+# - test_load_layout reads data/store_layout.json for STORE_BLR_002 / CAM_MAIN_02
+# - Heuristic tests for left-half SKINCARE, billing camera center, entry bottom band
+# - sku_for_zone linked to layout metadata (MOISTURISER / SERUM / SKINCARE)
+#
 """Zone classifier heuristics and layout parsing."""
 import json
 from pathlib import Path

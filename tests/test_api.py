@@ -1,3 +1,14 @@
+# PROMPT:
+# Verify Purplle Store Intelligence REST API acceptance: health, idempotent ingest,
+# staff excluded from funnel, empty-store zeros, customer journey funnel stages,
+# heatmap zones, and batch size limits. Use isolated DB state per test.
+#
+# CHANGES MADE:
+# - Added TestClient suite for /health, /events/ingest, /stores/{id}/metrics|funnel|heatmap
+# - autouse fixture clears EventDB between tests for deterministic counts
+# - Staff-only ingest case asserts funnel entry count excludes is_staff visitors
+# - Batch limit test asserts 501 events returns HTTP 400
+#
 """API endpoint tests — happy path + edge cases."""
 import uuid
 from datetime import datetime, timezone

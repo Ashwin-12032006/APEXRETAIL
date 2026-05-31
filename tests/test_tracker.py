@@ -1,3 +1,14 @@
+# PROMPT:
+# Exercise StoreTracker edge cases from DESIGN.md: ENTRY on new track, is_staff
+# propagation, billing queue_depth on BILLING_QUEUE_JOIN, re-entry after close_track,
+# and dwell_ms calculation between ISO timestamps.
+#
+# CHANGES MADE:
+# - Unit tests for pipeline.tracker.StoreTracker without API or video I/O
+# - Queue depth assertion on second visitor in BILLING zone
+# - Re-entry test after explicit close_track within Re-ID window
+# - calculate_dwell_ms helper validated for 30s wall-clock gap
+#
 """StoreTracker edge cases: re-entry, staff flag, queue."""
 import uuid
 from pipeline.tracker import StoreTracker, calculate_dwell_ms

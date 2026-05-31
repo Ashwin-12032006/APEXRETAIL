@@ -1,4 +1,5 @@
-version: "3.9"
+# One command starts the full stack (API + React). No .env, seed, or npm install required.
+#   docker compose up --build
 
 services:
   api:
@@ -9,7 +10,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data
+      # Named volume — Windows bind-mounts break SQLite (disk I/O error → 503)
+      - store_db_data:/app/data
       - ./dashboard/assets:/app/dashboard/assets
       - ./events:/app/events
     environment:
@@ -29,7 +31,7 @@ services:
       context: ./dashboard-ui
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:8000
+        VITE_API_URL: ""
     container_name: store_intelligence_dashboard
     ports:
       - "3000:3000"
@@ -46,7 +48,7 @@ services:
       dockerfile: Dockerfile.pipeline
     volumes:
       - ./dashboard/assets/cctv:/clips:ro
-      - ./data:/app/data
+      - store_db_data:/app/data
       - ./events:/app/events
     environment:
       - API_URL=http://api:8000
@@ -54,3 +56,6 @@ services:
       api:
         condition: service_healthy
     command: ["python", "scripts/run_yolo_five_cameras.py", "--api-url", "http://api:8000"]
+
+volumes:
+  store_db_data:

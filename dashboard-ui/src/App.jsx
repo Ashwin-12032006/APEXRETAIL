@@ -9,6 +9,7 @@ import ZoneHeatmap from './components/ZoneHeatmap';
 import AnomaliesList from './components/AnomaliesList';
 import CctvMonitor from './components/CctvMonitor';
 import HealthPanel from './components/HealthPanel';
+import StaffInsight from './components/StaffInsight';
 
 const STORES = [
   { id: 'STORE_BLR_002', label: 'Bangalore · Koramangala', city: 'BLR' },
@@ -64,6 +65,7 @@ export default function App() {
   return (
     <div className="shell">
       <div className="bg-mesh" aria-hidden />
+      <div className="bg-floor-grid" aria-hidden />
       <Sidebar tab={tab} onTab={setTab} legacyUrl={legacyUrl} />
       <div className="main">
         <Header
@@ -87,6 +89,7 @@ export default function App() {
         ) : (
           <>
             <ConversionHero metrics={metrics} funnel={funnel} loading={loading} storeId={storeId} />
+            <StaffInsight />
             <KpiGrid metrics={metrics} loading={loading} />
             <div className="grid-2">
               <FunnelChart data={funnel} loading={loading} />
