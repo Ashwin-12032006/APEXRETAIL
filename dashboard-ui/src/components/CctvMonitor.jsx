@@ -1,18 +1,36 @@
-import { useState } from 'react';
-import { assetUrl } from '../api';
+import { useEffect, useState } from 'react';
+import { assetUrl, resolveVideoUrl } from '../api';
 import { Maximize2, Circle } from 'lucide-react';
 
-const CAMS = [
-  { id: 'CAM1', label: 'Entry', sub: 'Threshold gate', file: '/assets/cctv/entry.mp4' },
-  { id: 'CAM2', label: 'Main floor', sub: 'Skincare aisle', file: '/assets/cctv/main_floor.mp4' },
-  { id: 'CAM3', label: 'Billing', sub: 'Queue & POS', file: '/assets/cctv/billing.mp4' },
-  { id: 'CAM4', label: 'Haircare', sub: 'Aisle B', file: '/assets/cctv/cam4.mp4' },
-  { id: 'CAM5', label: 'Billing 2', sub: 'Wide angle', file: '/assets/cctv/cam5.mp4' },
+const CAM_META = [
+  { id: 'CAM1', label: 'Entry', sub: 'Threshold gate', fallback: '/assets/cctv/entry.mp4' },
+  { id: 'CAM2', label: 'Main floor', sub: 'Skincare aisle', fallback: '/assets/cctv/main_floor.mp4' },
+  { id: 'CAM3', label: 'Billing', sub: 'Queue & POS', fallback: '/assets/cctv/billing.mp4' },
+  { id: 'CAM4', label: 'Haircare', sub: 'Aisle B', fallback: '/assets/cctv/cam4.mp4' },
+  { id: 'CAM5', label: 'Billing 2', sub: 'Wide angle', fallback: '/assets/cctv/cam5.mp4' },
 ];
+
+function videoSrc(external, fallback) {
+  const src = external?.trim() || fallback;
+  return resolveVideoUrl(src);
+}
 
 export default function CctvMonitor({ storeId, fullPage }) {
   const [active, setActive] = useState('CAM1');
-  const main = CAMS.find((c) => c.id === active) || CAMS[0];
+  const [sources, setSources] = useState({});
+
+  useEffect(() => {
+    fetch('/cctv-sources.json')
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((data) => setSources(data))
+      .catch(() => setSources({}));
+  }, []);
+
+  const cams = CAM_META.map((c) => ({
+    ...c,
+    file: videoSrc(sources[c.id], c.fallback),
+  }));
+  const main = cams.find((c) => c.id === active) || cams[0];
 
   return (
     <section className={`cctv-section glass ${fullPage ? 'cctv-full' : ''}`}>
@@ -31,7 +49,7 @@ export default function CctvMonitor({ storeId, fullPage }) {
         <video
           key={main.file}
           className="cctv-main-video"
-          src={assetUrl(main.file)}
+          src={main.file}
           autoPlay
           muted
           loop
@@ -51,7 +69,7 @@ export default function CctvMonitor({ storeId, fullPage }) {
       </div>
 
       <div className="pip-grid">
-        {CAMS.map((c) => (
+        {cams.map((c) => (
           <button
             key={c.id}
             type="button"
@@ -59,7 +77,7 @@ export default function CctvMonitor({ storeId, fullPage }) {
             onClick={() => setActive(c.id)}
           >
             <div className="pip-video-wrap">
-              <video src={assetUrl(c.file)} muted loop playsInline preload="metadata" />
+              <video src={c.file} muted loop playsInline preload="metadata" />
               {c.id === active && <span className="pip-live">LIVE</span>}
             </div>
             <div className="pip-meta">
