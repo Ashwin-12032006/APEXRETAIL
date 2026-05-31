@@ -1,26 +1,26 @@
 {
-  "_comment": "User CCTV dataset: CAM 1-5 MP4 files in /assets/cctv/",
+  "_comment": "Google Drive — set each file to Anyone with the link (Viewer)",
   "camera_map": {
-    "CAM1": "entry.mp4",
-    "CAM2": "main_floor.mp4",
-    "CAM3": "billing.mp4",
-    "CAM4": "cam4.mp4",
-    "CAM5": "cam5.mp4"
+    "CAM1": "CAM 1.mp4",
+    "CAM2": "CAM 2.mp4",
+    "CAM3": "CAM 3.mp4",
+    "CAM4": "CAM 4.mp4",
+    "CAM5": "CAM 5.mp4"
   },
   "default": {
-    "CAM1": { "label": "CAM 1", "sources": ["/assets/cctv/entry.mp4"] },
-    "CAM2": { "label": "CAM 2", "sources": ["/assets/cctv/main_floor.mp4"] },
-    "CAM3": { "label": "CAM 3", "sources": ["/assets/cctv/billing.mp4"] },
-    "CAM4": { "label": "CAM 4", "sources": ["/assets/cctv/cam4.mp4"] },
-    "CAM5": { "label": "CAM 5", "sources": ["/assets/cctv/cam5.mp4"] }
+    "CAM1": { "label": "CAM 1", "sources": ["https://drive.google.com/file/d/1z6qK2164vaomm1-9RJfyyEqeWj9cFOGn/view"] },
+    "CAM2": { "label": "CAM 2", "sources": ["https://drive.google.com/file/d/1vwNzH5wR8IN1H_me8l7UXc-UciM5hVJL/view"] },
+    "CAM3": { "label": "CAM 3", "sources": ["https://drive.google.com/file/d/1yWZgawwER4Ab0ICk3bVmIP7N-kdy_qHS/view"] },
+    "CAM4": { "label": "CAM 4", "sources": ["https://drive.google.com/file/d/1Q9_uFYDJ-u9DZqodu4YWkVUcUmeLM86A/view"] },
+    "CAM5": { "label": "CAM 5", "sources": ["https://drive.google.com/file/d/1FRcr78s78bx4KczdFuAFMkc1eEBFTtH6/view"] }
   },
   "stores": {
     "STORE_BLR_002": {
-      "CAM1": { "sources": ["/assets/cctv/entry.mp4"] },
-      "CAM2": { "sources": ["/assets/cctv/main_floor.mp4"] },
-      "CAM3": { "sources": ["/assets/cctv/billing.mp4"] },
-      "CAM4": { "sources": ["/assets/cctv/cam4.mp4"] },
-      "CAM5": { "sources": ["/assets/cctv/cam5.mp4"] }
+      "CAM1": { "sources": ["https://drive.google.com/file/d/1z6qK2164vaomm1-9RJfyyEqeWj9cFOGn/view"] },
+      "CAM2": { "sources": ["https://drive.google.com/file/d/1vwNzH5wR8IN1H_me8l7UXc-UciM5hVJL/view"] },
+      "CAM3": { "sources": ["https://drive.google.com/file/d/1yWZgawwER4Ab0ICk3bVmIP7N-kdy_qHS/view"] },
+      "CAM4": { "sources": ["https://drive.google.com/file/d/1Q9_uFYDJ-u9DZqodu4YWkVUcUmeLM86A/view"] },
+      "CAM5": { "sources": ["https://drive.google.com/file/d/1FRcr78s78bx4KczdFuAFMkc1eEBFTtH6/view"] }
     }
   }
 }

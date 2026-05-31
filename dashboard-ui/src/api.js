@@ -10,13 +10,29 @@ export function assetUrl(path) {
   return path;
 }
 
-/** Turn Google Drive share links into a direct-play URL for <video src>. */
+/** Extract Google Drive file id from a share or direct URL. */
+export function googleDriveFileId(src) {
+  if (!src || typeof src !== 'string') return null;
+  return src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]
+    || src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1]
+    || null;
+}
+
+export function isGoogleDriveSource(src) {
+  return !!googleDriveFileId(src);
+}
+
+/** iframe embed — reliable for public Drive MP4s (video tag often fails). */
+export function driveEmbedUrl(src) {
+  const id = googleDriveFileId(src);
+  return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+}
+
+/** Local/API path or direct mp4 URL for HTML5 video. */
 export function resolveVideoUrl(src) {
   if (!src) return '';
+  if (isGoogleDriveSource(src)) return driveEmbedUrl(src);
   if (!/^https?:\/\//i.test(src)) return assetUrl(src);
-  const fileId = src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]
-    || src.match(/[?&]id=([a-zA-Z0-9_-]+)/)?.[1];
-  if (fileId) return `https://drive.google.com/uc?export=view&id=${fileId}`;
   return src;
 }
 

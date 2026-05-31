@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { assetUrl, resolveVideoUrl } from '../api';
+import { assetUrl, driveEmbedUrl, isGoogleDriveSource, resolveVideoUrl } from '../api';
 import { Maximize2, Circle } from 'lucide-react';
 
 const CAM_META = [
@@ -10,9 +10,41 @@ const CAM_META = [
   { id: 'CAM5', label: 'Billing 2', sub: 'Wide angle', fallback: '/assets/cctv/cam5.mp4' },
 ];
 
-function videoSrc(external, fallback) {
-  const src = external?.trim() || fallback;
-  return resolveVideoUrl(src);
+function resolveCamSource(external, fallback) {
+  const raw = external?.trim() || fallback;
+  const driveEmbed = driveEmbedUrl(raw);
+  return {
+    raw,
+    driveEmbed,
+    videoSrc: driveEmbed ? null : resolveVideoUrl(raw),
+  };
+}
+
+function CctvFeed({ source, className, pip }) {
+  if (source.driveEmbed) {
+    return (
+      <iframe
+        title="CCTV feed"
+        src={source.driveEmbed}
+        className={className}
+        allow="autoplay; fullscreen"
+        loading="lazy"
+        style={pip ? { pointerEvents: 'none' } : undefined}
+      />
+    );
+  }
+  return (
+    <video
+      className={className}
+      src={source.videoSrc}
+      autoPlay={!pip}
+      muted
+      loop
+      playsInline
+      controls={!pip}
+      preload={pip ? 'metadata' : 'auto'}
+    />
+  );
 }
 
 export default function CctvMonitor({ storeId, fullPage }) {
@@ -28,16 +60,19 @@ export default function CctvMonitor({ storeId, fullPage }) {
 
   const cams = CAM_META.map((c) => ({
     ...c,
-    file: videoSrc(sources[c.id], c.fallback),
+    source: resolveCamSource(sources[c.id], c.fallback),
   }));
   const main = cams.find((c) => c.id === active) || cams[0];
+  const usingDrive = isGoogleDriveSource(sources[main.id]);
 
   return (
     <section className={`cctv-section glass ${fullPage ? 'cctv-full' : ''}`}>
       <div className="panel-head">
         <div>
           <h2>Live CCTV — 5 camera mesh</h2>
-          <p className="hint">{storeId} · YOLOv8 pipeline · staff black-coat detection on legacy UI</p>
+          <p className="hint">
+            {storeId} · {usingDrive ? 'Google Drive stream' : 'YOLOv8 pipeline'} · staff detection on legacy UI
+          </p>
         </div>
         <span className="live-pill on">
           <span className="live-dot" />
@@ -45,17 +80,8 @@ export default function CctvMonitor({ storeId, fullPage }) {
         </span>
       </div>
 
-      <div className="cctv-stage">
-        <video
-          key={main.file}
-          className="cctv-main-video"
-          src={main.file}
-          autoPlay
-          muted
-          loop
-          playsInline
-          controls
-        />
+      <div className={`cctv-stage ${main.source.driveEmbed ? 'cctv-stage-embed' : ''}`}>
+        <CctvFeed source={main.source} className="cctv-main-video" />
         <div className="cctv-overlay">
           <div className="overlay-tag">
             <Maximize2 size={14} />
@@ -63,7 +89,7 @@ export default function CctvMonitor({ storeId, fullPage }) {
           </div>
           <div className="overlay-stats">
             <span><Circle size={8} fill="#34d399" color="#34d399" /> LIVE</span>
-            <span>30 FPS · 1080p</span>
+            <span>{usingDrive ? 'Drive embed' : '30 FPS · 1080p'}</span>
           </div>
         </div>
       </div>
@@ -77,7 +103,7 @@ export default function CctvMonitor({ storeId, fullPage }) {
             onClick={() => setActive(c.id)}
           >
             <div className="pip-video-wrap">
-              <video src={c.file} muted loop playsInline preload="metadata" />
+              <CctvFeed source={c.source} className="pip-video" pip />
               {c.id === active && <span className="pip-live">LIVE</span>}
             </div>
             <div className="pip-meta">
