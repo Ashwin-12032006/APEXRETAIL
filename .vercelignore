@@ -1,0 +1,11 @@
+yolov8n.pt
+dashboard-ui
+tests
+Dockerfile
+Dockerfile.pipeline
+docker-compose.yml
+requirements.txt
+pipeline/detect.py
+pipeline/byte_tracker.py
+pipeline/staff_detector.py
+events

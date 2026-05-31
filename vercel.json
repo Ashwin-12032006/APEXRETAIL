@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pip install -r requirements-vercel.txt",
+  "functions": {
+    "app/main.py": {
+      "excludeFiles": "{pipeline/detect.py,pipeline/byte_tracker.py,pipeline/staff_detector.py,pipeline/run.sh,scripts/**,tests/**,dashboard-ui/**,dashboard/assets/cctv/**,events/**,yolov8n.pt,Dockerfile*,docker-compose.yml,*.pt,requirements.txt}"
+    }
+  }
+}

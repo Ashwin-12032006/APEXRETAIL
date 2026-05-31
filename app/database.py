@@ -6,8 +6,13 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
-# Define database URL
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///d:/APEX RETAIL_KASH/store-intelligence/data/store_intelligence.db")
+# Define database URL (/tmp on Vercel — serverless has no persistent disk)
+_DEFAULT_SQLITE = (
+    "sqlite:////tmp/store_intelligence.db"
+    if os.getenv("VERCEL")
+    else "sqlite:///d:/APEX RETAIL_KASH/store-intelligence/data/store_intelligence.db"
+)
+DATABASE_URL = os.getenv("DATABASE_URL", _DEFAULT_SQLITE)
 
 # Serialize SQLite writes (simulator + ingest); WAL allows concurrent reads
 db_write_lock = threading.Lock()
