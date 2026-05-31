@@ -747,6 +747,28 @@
             font-size: 0.75rem;
         }
 
+        .cv-drive-notice {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 8;
+            background: rgba(10, 8, 18, 0.88);
+            border: 1px solid rgba(255, 0, 255, 0.35);
+            color: #e9d5ff;
+            font-size: 0.68rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: 6px;
+            pointer-events: none;
+            display: none;
+            max-width: 92%;
+            text-align: center;
+        }
+
+        .cv-drive-notice.visible {
+            display: block;
+        }
+
         .camera-selector-bar {
             display: flex;
             gap: 0.5rem;
@@ -1442,6 +1464,7 @@
                             or run <code>scripts\download_cctv_samples.ps1</code></span>
                         </div>
                         <div class="cv-scanlines"></div>
+                        <div class="cv-drive-notice" id="cv-drive-notice">Drive stream — demo overlays only. Real face + staff detection needs local MP4 (Docker).</div>
                         <div class="cv-face-sidebar" id="cv-face-sidebar"></div>
                         <canvas id="cvCanvas"></canvas>
                     </div>
@@ -1795,6 +1818,7 @@
         };
         const CV_SIDEBAR_RESERVE = 175;
         let activeVideoElement = null;
+        let cctvDriveEmbedActive = false;
         let liveFaceCache = {};
         let faceImgCache = {};
         let faceCropFrameCounter = 0;
@@ -2149,8 +2173,19 @@
             videoEl.style.display = '';
         }
 
+        function setDriveEmbedMode(active) {
+            cctvDriveEmbedActive = active;
+            const notice = document.getElementById('cv-drive-notice');
+            if (notice) notice.classList.toggle('visible', active);
+            if (active) {
+                useRealFaceDetection = false;
+                activeDetectedFaces = [];
+            }
+        }
+
         function mountDriveEmbedForVideo(videoEl, embedUrl, onReady) {
             if (!videoEl || !videoEl.parentElement) return;
+            setDriveEmbedMode(true);
             videoEl.style.display = 'none';
             videoEl.removeAttribute('src');
             let iframe = videoEl.parentElement.querySelector('.cv-drive-iframe[data-for="' + videoEl.id + '"]');
@@ -2200,6 +2235,7 @@
             }
 
             const onSuccess = () => {
+                if (videoEl.id === 'cvMainVideo') setDriveEmbedMode(false);
                 if (videoEl.id === 'cvMainVideo') {
                     mainVideoReady = true;
                     if (hint) hint.classList.remove('visible');
@@ -2295,7 +2331,9 @@
             { id: 'VIS_custB02', is_staff: false, conf: 0.94, color: '#a8a5e6', current_zone: 'HAIRCARE', path: ['ENTRY', 'HAIRCARE'], x: 280, y: 240, dx: -0.85, dy: 0.7, w: 48, h: 95, zoneTimer: 1100, face: '/assets/shopper2.png', mapX: 75, mapY: 75 },
             { id: 'VIS_custC02', is_staff: false, conf: 0.95, color: '#f59e0b', current_zone: 'BILLING', path: ['ENTRY', 'HAIRCARE', 'BILLING'], x: 220, y: 170, dx: 0, dy: 0, w: 48, h: 95, queue_idx: 1, face: '/assets/shopper3.png', mapX: 25, mapY: 75 },
             { id: 'VIS_custD03', is_staff: false, conf: 0.97, color: '#f59e0b', current_zone: 'BILLING', path: ['ENTRY', 'SKINCARE', 'BILLING'], x: 150, y: 170, dx: 0, dy: 0, w: 48, h: 95, queue_idx: 0, face: '/assets/shopper1.png', mapX: 25, mapY: 75 },
-            { id: 'VIS_staff01', is_staff: true, conf: 0.99, color: '#ff00ff', current_zone: 'SKINCARE', path: ['ENTRY', 'SKINCARE'], x: 340, y: 125, dx: -0.75, dy: 0.55, w: 45, h: 90, face: '/assets/staff1.png', mapX: 45, mapY: 40 }
+            { id: 'VIS_staff01', is_staff: true, conf: 0.99, color: '#ff00ff', current_zone: 'SKINCARE', path: ['ENTRY', 'SKINCARE'], x: 340, y: 125, dx: -0.75, dy: 0.55, w: 45, h: 90, face: '/assets/staff1.png', mapX: 45, mapY: 40 },
+            { id: 'VIS_staff02', is_staff: true, conf: 0.98, color: '#ff00ff', current_zone: 'BILLING', path: ['ENTRY', 'BILLING'], x: 360, y: 130, dx: -0.4, dy: 0.35, w: 46, h: 92, face: '/assets/staff1.png', mapX: 30, mapY: 55 },
+            { id: 'VIS_staff03', is_staff: true, conf: 0.97, color: '#ff00ff', current_zone: 'BILLING', path: ['ENTRY', 'BILLING'], x: 300, y: 185, dx: 0.35, dy: -0.25, w: 44, h: 88, face: '/assets/staff1.png', mapX: 38, mapY: 62 }
         ];
 
         let visitorPathHistories = {
@@ -2303,7 +2341,9 @@
             'VIS_custB02': ['ENTRY', 'HAIRCARE'],
             'VIS_custC02': ['ENTRY', 'HAIRCARE', 'BILLING'],
             'VIS_custD03': ['ENTRY', 'SKINCARE', 'BILLING'],
-            'VIS_staff01': ['ENTRY', 'SKINCARE']
+            'VIS_staff01': ['ENTRY', 'SKINCARE'],
+            'VIS_staff02': ['ENTRY', 'BILLING'],
+            'VIS_staff03': ['ENTRY', 'BILLING']
         };
 
         async function preloadAllCameraFeeds() {
