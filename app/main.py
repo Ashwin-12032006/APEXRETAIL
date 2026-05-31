@@ -15,6 +15,7 @@ from app.funnel import router as funnel_router
 from app.heatmap import router as heatmap_router
 from app.anomalies import router as anomalies_router
 from app.health import router as health_router
+from app.cctv_config import router as cctv_config_router
 
 # Create DB Tables
 try:
@@ -44,6 +45,9 @@ app = FastAPI(
     description="Real-time CCTV-based store tracking and POS transaction analytics API.",
     version="1.0.0"
 )
+
+# Dynamic CCTV config (env URLs) before static /assets mount
+app.include_router(cctv_config_router, tags=["CCTV"])
 
 # Mount static assets directory
 dashboard_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dashboard")

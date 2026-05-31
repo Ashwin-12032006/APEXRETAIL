@@ -1456,7 +1456,7 @@
                             <div><span class="cv-rec-dot"></span><span id="cv-cam-name">CAM_ENTRY_02</span></div>
                             <div id="cv-timestamp">2026-05-30 14:40:00.125</div>
                         </div>
-                        <video id="cvMainVideo" class="cv-main-video" muted loop playsinline autoplay></video>
+                        <video id="cvMainVideo" class="cv-main-video" muted loop playsinline autoplay crossorigin="anonymous"></video>
                         <div class="cv-video-hint" id="cv-video-hint">
                             <strong style="color:#f1f3f9;margin-bottom:0.5rem;">No CCTV video loaded</strong>
                             <span>Add dummy retail MP4s to <code>dashboard/assets/cctv/</code><br>
@@ -1472,31 +1472,31 @@
                         <div class="cv-pip-tile active loading" id="pip-CAM1" onclick="switchCamera('CAM1')" title="CAM 1">
                             <span class="cv-pip-live">LIVE</span>
                             <span class="cv-pip-buffer">LOADING…</span>
-                            <video id="pipVideoCAM1" class="cv-pip-video" muted loop playsinline preload="auto"></video>
+                            <video id="pipVideoCAM1" class="cv-pip-video" muted loop playsinline preload="auto" crossorigin="anonymous"></video>
                             <span class="cv-pip-label">CAM 1</span>
                         </div>
                         <div class="cv-pip-tile loading" id="pip-CAM2" onclick="switchCamera('CAM2')" title="CAM 2">
                             <span class="cv-pip-live">LIVE</span>
                             <span class="cv-pip-buffer">LOADING…</span>
-                            <video id="pipVideoCAM2" class="cv-pip-video" muted loop playsinline preload="auto"></video>
+                            <video id="pipVideoCAM2" class="cv-pip-video" muted loop playsinline preload="auto" crossorigin="anonymous"></video>
                             <span class="cv-pip-label">CAM 2</span>
                         </div>
                         <div class="cv-pip-tile loading" id="pip-CAM3" onclick="switchCamera('CAM3')" title="CAM 3">
                             <span class="cv-pip-live">LIVE</span>
                             <span class="cv-pip-buffer">LOADING…</span>
-                            <video id="pipVideoCAM3" class="cv-pip-video" muted loop playsinline preload="auto"></video>
+                            <video id="pipVideoCAM3" class="cv-pip-video" muted loop playsinline preload="auto" crossorigin="anonymous"></video>
                             <span class="cv-pip-label">CAM 3</span>
                         </div>
                         <div class="cv-pip-tile loading" id="pip-CAM4" onclick="switchCamera('CAM4')" title="CAM 4">
                             <span class="cv-pip-live">LIVE</span>
                             <span class="cv-pip-buffer">LOADING…</span>
-                            <video id="pipVideoCAM4" class="cv-pip-video" muted loop playsinline preload="auto"></video>
+                            <video id="pipVideoCAM4" class="cv-pip-video" muted loop playsinline preload="auto" crossorigin="anonymous"></video>
                             <span class="cv-pip-label">CAM 4</span>
                         </div>
                         <div class="cv-pip-tile loading" id="pip-CAM5" onclick="switchCamera('CAM5')" title="CAM 5">
                             <span class="cv-pip-live">LIVE</span>
                             <span class="cv-pip-buffer">LOADING…</span>
-                            <video id="pipVideoCAM5" class="cv-pip-video" muted loop playsinline preload="auto"></video>
+                            <video id="pipVideoCAM5" class="cv-pip-video" muted loop playsinline preload="auto" crossorigin="anonymous"></video>
                             <span class="cv-pip-label">CAM 5</span>
                         </div>
                     </div>
@@ -2115,7 +2115,7 @@
 
         async function loadCctvConfig() {
             try {
-                const res = await fetch('/assets/cctv-feeds.json');
+                const res = await fetch('/cctv/feeds.json');
                 if (res.ok) cctvConfig = await res.json();
             } catch (e) {
                 console.warn('CCTV config load failed', e);
@@ -2164,6 +2164,14 @@
             const id = googleDriveFileId(url);
             if (!id) return null;
             return `https://drive.google.com/file/d/${id}/preview` + (autoplay ? '?autoplay=1' : '');
+        }
+
+        function isDirectMp4(url) {
+            if (!url) return false;
+            if (url.startsWith('/assets/cctv/') && url.indexOf('drive') === -1) return true;
+            if (/\.mp4(\?|$)/i.test(url)) return true;
+            if (/cloudinary\.com|mixkit\.co|amazonaws\.com/i.test(url)) return true;
+            return false;
         }
 
         function clearDriveEmbed(videoEl) {
@@ -2220,8 +2228,17 @@
                     return;
                 }
                 const src = sources[idx++];
+                if (isDirectMp4(src)) {
+                    clearDriveEmbed(videoEl);
+                    setDriveEmbedMode(false);
+                    videoEl.style.display = '';
+                    videoEl.crossOrigin = 'anonymous';
+                    videoEl.src = src;
+                    videoEl.load();
+                    return;
+                }
                 const embed = googleDriveEmbed(src, true);
-                if (embed && !isLocalHost()) {
+                if (embed) {
                     clearDriveEmbed(videoEl);
                     mountDriveEmbedForVideo(videoEl, embed, () => {
                         if (videoEl.id === 'cvMainVideo') {

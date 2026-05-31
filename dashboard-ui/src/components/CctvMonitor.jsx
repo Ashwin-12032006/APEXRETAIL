@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { assetUrl, driveEmbedUrl, isGoogleDriveSource, resolveVideoUrl } from '../api';
+import {
+  assetUrl,
+  driveEmbedUrl,
+  fetchJson,
+  isDirectVideoUrl,
+  isGoogleDriveSource,
+  resolveVideoUrl,
+} from '../api';
 import { Maximize2, Circle } from 'lucide-react';
 
 const CAM_META = [
@@ -10,18 +17,24 @@ const CAM_META = [
   { id: 'CAM5', label: 'Billing 2', sub: 'Wide angle', fallback: '/assets/cctv/cam5.mp4' },
 ];
 
+function firstSource(raw, fallback) {
+  if (Array.isArray(raw)) return raw[0] || fallback;
+  if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  return fallback;
+}
+
 function resolveCamSource(external, fallback) {
-  const isLocalDev = typeof window !== 'undefined'
-    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  if (isLocalDev && fallback) {
-    return { raw: fallback, driveEmbed: null, videoSrc: assetUrl(fallback) };
+  const raw = firstSource(external, fallback);
+  if (isDirectVideoUrl(raw)) {
+    const videoSrc = /^https?:\/\//i.test(raw) ? raw : assetUrl(raw);
+    return { raw, driveEmbed: null, videoSrc, crossOrigin: true };
   }
-  const raw = external?.trim() || fallback;
   const driveEmbed = driveEmbedUrl(raw);
   return {
     raw,
     driveEmbed,
     videoSrc: driveEmbed ? null : resolveVideoUrl(raw),
+    crossOrigin: false,
   };
 }
 
@@ -42,6 +55,7 @@ function CctvFeed({ source, className, pip }) {
     <video
       className={className}
       src={source.videoSrc}
+      crossOrigin={source.crossOrigin ? 'anonymous' : undefined}
       autoPlay
       muted
       loop
@@ -57,18 +71,30 @@ export default function CctvMonitor({ storeId, fullPage }) {
   const [sources, setSources] = useState({});
 
   useEffect(() => {
-    fetch('/cctv-sources.json')
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((data) => setSources(data))
-      .catch(() => setSources({}));
-  }, []);
+    fetchJson('/cctv/feeds.json')
+      .then((feeds) => {
+        const mapped = {};
+        CAM_META.forEach((c) => {
+          const fromStore = feeds?.stores?.[storeId]?.[c.id]?.sources;
+          const fromDefault = feeds?.default?.[c.id]?.sources;
+          mapped[c.id] = fromStore || fromDefault || [];
+        });
+        setSources(mapped);
+      })
+      .catch(() => {
+        fetch('/cctv-sources.json')
+          .then((r) => (r.ok ? r.json() : {}))
+          .then((data) => setSources(data))
+          .catch(() => setSources({}));
+      });
+  }, [storeId]);
 
   const cams = CAM_META.map((c) => ({
     ...c,
     source: resolveCamSource(sources[c.id], c.fallback),
   }));
   const main = cams.find((c) => c.id === active) || cams[0];
-  const usingDrive = isGoogleDriveSource(sources[main.id]);
+  const usingDrive = isGoogleDriveSource(firstSource(sources[main.id], main.fallback));
 
   return (
     <section className={`cctv-section glass ${fullPage ? 'cctv-full' : ''}`}>
@@ -76,7 +102,7 @@ export default function CctvMonitor({ storeId, fullPage }) {
         <div>
           <h2>Live CCTV — 5 camera mesh</h2>
           <p className="hint">
-            {storeId} · {usingDrive ? 'Google Drive stream' : 'YOLOv8 pipeline'} · staff detection on legacy UI
+            {storeId} · {usingDrive ? 'Google Drive stream' : 'Direct MP4 · CV-ready'} · legacy UI for face + staff
           </p>
         </div>
         <span className="live-pill on">
@@ -94,7 +120,7 @@ export default function CctvMonitor({ storeId, fullPage }) {
           </div>
           <div className="overlay-stats">
             <span><Circle size={8} fill="#34d399" color="#34d399" /> LIVE</span>
-            <span>{usingDrive ? 'Drive embed' : '30 FPS · 1080p'}</span>
+            <span>{usingDrive ? 'Drive embed' : 'MP4 · face detect'}</span>
           </div>
         </div>
       </div>

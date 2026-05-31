@@ -10,7 +10,15 @@ export function assetUrl(path) {
   return path;
 }
 
-/** Extract Google Drive file id from a share or direct URL. */
+/** Direct MP4 / CDN — face-api works when host sends CORS (Cloudinary, local). */
+export function isDirectVideoUrl(src) {
+  if (!src || typeof src !== 'string') return false;
+  if (src.startsWith('/assets/cctv/') && !src.includes('drive.google.com')) return true;
+  if (/\.mp4(\?|$)/i.test(src)) return true;
+  if (/cloudinary\.com|mixkit\.co|amazonaws\.com/i.test(src)) return true;
+  return false;
+}
+
 export function googleDriveFileId(src) {
   if (!src || typeof src !== 'string') return null;
   return src.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]
@@ -22,16 +30,18 @@ export function isGoogleDriveSource(src) {
   return !!googleDriveFileId(src);
 }
 
-/** iframe embed — reliable for public Drive MP4s (video tag often fails). */
 export function driveEmbedUrl(src, autoplay = true) {
   const id = googleDriveFileId(src);
   if (!id) return null;
   return `https://drive.google.com/file/d/${id}/preview${autoplay ? '?autoplay=1' : ''}`;
 }
 
-/** Local/API path or direct mp4 URL for HTML5 video. */
 export function resolveVideoUrl(src) {
   if (!src) return '';
+  if (isDirectVideoUrl(src)) {
+    if (!/^https?:\/\//i.test(src)) return assetUrl(src);
+    return src;
+  }
   if (isGoogleDriveSource(src)) return driveEmbedUrl(src);
   if (!/^https?:\/\//i.test(src)) return assetUrl(src);
   return src;
