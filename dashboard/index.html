@@ -1137,9 +1137,63 @@
             padding: 1.5rem;
             max-height: 450px;
             overflow-y: auto;
+            overflow-x: hidden;
             color: var(--text-secondary);
             font-size: 0.9rem;
             line-height: 1.5;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.14) rgba(255, 255, 255, 0.03);
+        }
+
+        .modal-body::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .modal-body::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
+        }
+
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: rgba(108, 92, 231, 0.4);
+        }
+
+        .modal-content.modal-content--ledger {
+            max-width: min(96vw, 920px);
+        }
+
+        .ledger-scroll-wrap {
+            overflow-x: auto;
+            overflow-y: visible;
+            margin-top: 1rem;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.14) rgba(255, 255, 255, 0.03);
+        }
+
+        .ledger-scroll-wrap::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .ledger-scroll-wrap::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+        }
+
+        .ledger-scroll-wrap::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
+        }
+
+        .ledger-scroll-wrap::-webkit-scrollbar-thumb:hover {
+            background: rgba(108, 92, 231, 0.4);
         }
 
         /* Ledger Tables */
@@ -1148,7 +1202,8 @@
             border-collapse: collapse;
             font-size: 0.8rem;
             text-align: left;
-            margin-top: 1rem;
+            margin-top: 0;
+            min-width: 680px;
         }
 
         .ledger-table th {
@@ -2110,7 +2165,7 @@
             const sidebar = document.getElementById('cv-face-sidebar');
             if (!sidebar) return;
 
-            if (activeDetectedFaces.length) {
+            if (displayDetectedFaces.length || activeDetectedFaces.length) {
                 updateFaceSidebarFromDetections();
                 return;
             }
@@ -2214,9 +2269,17 @@
         let ssdModelReady = false;
         let faceDetectBusy = false;
         let activeDetectedFaces = [];
+        let displayDetectedFaces = [];
         let useRealFaceDetection = true;
         let faceTrackPool = [];
         let faceTrackSeq = 0;
+        let lastRealFaceAt = 0;
+        let lastFaceSidebarSig = '';
+        const FACE_SMOOTH_ALPHA = 0.28;
+        const FACE_DETECT_INTERVAL = 8;
+        const FACE_TRACK_GRACE_MS = 3000;
+        const FACE_MIN_HITS = 2;
+        const FACE_TRACK_TTL_MS = 4000;
         const attireSampleCanvas = document.createElement('canvas');
         const attireSampleCtx = attireSampleCanvas.getContext('2d', { willReadFrequently: true });
         /** Staff uniform: black formal coat (dark torso, low color saturation). */
@@ -2421,6 +2484,33 @@
             });
         }
 
+        function smoothFaceDim(prev, next, alpha) {
+            return prev + (next - prev) * alpha;
+        }
+
+        function smoothFaceBox(prev, raw) {
+            if (!prev) return { x: raw.x, y: raw.y, w: raw.w, h: raw.h };
+            const a = FACE_SMOOTH_ALPHA;
+            return {
+                x: smoothFaceDim(prev.x, raw.x, a),
+                y: smoothFaceDim(prev.y, raw.y, a),
+                w: smoothFaceDim(prev.w, raw.w, a),
+                h: smoothFaceDim(prev.h, raw.h, a)
+            };
+        }
+
+        function syncDisplayDetectedFaces() {
+            const now = Date.now();
+            if (activeDetectedFaces.length) {
+                lastRealFaceAt = now;
+                displayDetectedFaces = activeDetectedFaces;
+            } else if (now - lastRealFaceAt < FACE_TRACK_GRACE_MS && displayDetectedFaces.length) {
+                return;
+            } else {
+                displayDetectedFaces = [];
+            }
+        }
+
         function assignStableFaceTracks(detections) {
             const now = Date.now();
             const out = [];
@@ -2433,7 +2523,7 @@
                 const fh = d.box.height;
                 const box = { x: fx, y: fy, w: fw, h: fh };
                 let best = null;
-                let bestIou = 0.28;
+                let bestIou = 0.32;
                 for (const t of faceTrackPool) {
                     const iou = iouRect(box, t.box);
                     if (iou > bestIou) {
@@ -2441,24 +2531,41 @@
                         bestIou = iou;
                     }
                 }
-                let id;
+                let trackRef;
+                const score = d.score ?? d.detection?.score ?? 0.5;
                 if (best) {
-                    id = best.id;
-                    best.box = box;
-                    best.lastSeen = now;
-                    matchedTracks.add(best);
+                    trackRef = best;
+                    trackRef.box = box;
+                    trackRef.smoothBox = smoothFaceBox(trackRef.smoothBox, box);
+                    trackRef.hits = (trackRef.hits || 0) + 1;
+                    trackRef.scoreSmooth = trackRef.scoreSmooth != null
+                        ? trackRef.scoreSmooth * 0.82 + score * 0.18
+                        : score;
+                    trackRef.lastSeen = now;
+                    matchedTracks.add(trackRef);
                 } else {
                     faceTrackSeq += 1;
-                    id = `VIS_live_${String(faceTrackSeq).padStart(3, '0')}`;
-                    const track = { id, box, lastSeen: now, attireHistory: [] };
-                    faceTrackPool.push(track);
-                    matchedTracks.add(track);
+                    const id = `VIS_live_${String(faceTrackSeq).padStart(3, '0')}`;
+                    trackRef = {
+                        id,
+                        box,
+                        smoothBox: { x: fx, y: fy, w: fw, h: fh },
+                        hits: 1,
+                        scoreSmooth: score,
+                        lastSeen: now,
+                        attireHistory: []
+                    };
+                    faceTrackPool.push(trackRef);
+                    matchedTracks.add(trackRef);
                 }
-                const score = d.score ?? 0.5;
-                const person = expandFaceToPersonBox(fx, fy, fw, fh);
-                const pad = 6;
+
+                if ((trackRef.hits || 0) < FACE_MIN_HITS) return;
+
+                const sb = trackRef.smoothBox || box;
+                const stableScore = trackRef.scoreSmooth ?? score;
+                const person = expandFaceToPersonBox(sb.x, sb.y, sb.w, sb.h);
                 out.push({
-                    id,
+                    id: trackRef.id,
                     x: person.x,
                     y: person.y,
                     w: person.w,
@@ -2467,26 +2574,26 @@
                     faceY: person.faceY,
                     faceW: person.faceW,
                     faceH: person.faceH,
-                    score,
-                    color: score > 0.55 ? '#00ff66' : score > 0.35 ? '#f59e0b' : '#a8a5e6',
-                    conf: score
+                    score: stableScore,
+                    color: stableScore > 0.55 ? '#00ff66' : stableScore > 0.35 ? '#f59e0b' : '#a8a5e6',
+                    conf: stableScore
                 });
             });
 
-            faceTrackPool = faceTrackPool.filter(t => now - t.lastSeen < 2500 || matchedTracks.has(t));
+            faceTrackPool = faceTrackPool.filter(t => now - t.lastSeen < FACE_TRACK_TTL_MS || matchedTracks.has(t));
             return out;
         }
 
         async function runMultiModelFaceDetect(videoEl, displaySize) {
             const tinyOpts = new faceapi.TinyFaceDetectorOptions({
-                inputSize: 608,
-                scoreThreshold: 0.18
+                inputSize: 416,
+                scoreThreshold: 0.24
             });
             const tiny = await faceapi.detectAllFaces(videoEl, tinyOpts);
             let merged = faceapi.resizeResults(tiny, displaySize);
 
             if (ssdModelReady && merged.length < 5) {
-                const ssdOpts = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35, maxResults: 12 });
+                const ssdOpts = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.42, maxResults: 8 });
                 const ssd = await faceapi.detectAllFaces(videoEl, ssdOpts);
                 const resizedSsd = faceapi.resizeResults(ssd, displaySize);
                 merged = merged.concat(resizedSsd);
@@ -2775,6 +2882,7 @@
                 const displaySize = { width: cvCanvas.width, height: cvCanvas.height };
                 const detections = await runMultiModelFaceDetect(activeVideoElement, displaySize);
                 activeDetectedFaces = assignStableFaceTracks(detections);
+                syncDisplayDetectedFaces();
                 applyAttireToAllDetectedFaces();
                 const facesEl = document.getElementById('cv-stat-faces');
                 if (facesEl) {
@@ -2793,7 +2901,8 @@
 
         function refreshLiveFaceCropsFromDetections() {
             if (!activeVideoElement || activeVideoElement.readyState < 2) return;
-            activeDetectedFaces.forEach(f => {
+            const faces = displayDetectedFaces.length ? displayDetectedFaces : activeDetectedFaces;
+            faces.forEach(f => {
                 const crop = captureFaceCropFromBox(f, true);
                 if (crop) liveFaceCache[f.id] = crop;
             });
@@ -2825,12 +2934,16 @@
         function updateFaceSidebarFromDetections() {
             const sidebar = document.getElementById('cv-face-sidebar');
             if (!sidebar) return;
-            if (!activeDetectedFaces.length) {
+            const faces = displayDetectedFaces.length ? displayDetectedFaces : activeDetectedFaces;
+            if (!faces.length) {
                 updateFaceSidebar();
                 return;
             }
+            const sig = faces.map(f => `${f.id}:${Math.round((f.score || 0) * 100)}`).join('|');
+            if (sig === lastFaceSidebarSig) return;
+            lastFaceSidebarSig = sig;
             let html = '';
-            activeDetectedFaces.forEach(f => {
+            faces.forEach(f => {
                 const img = liveFaceCache[f.id] || '';
                 const pct = Math.round((f.score || f.conf || 0) * 100);
                 const roleBadge = f.is_staff
@@ -2877,16 +2990,6 @@
                 if (img.complete && img.naturalWidth) {
                     cvCtx.drawImage(img, tx, ty, thumb, thumb);
                 }
-            } else if (activeVideoElement && activeVideoElement.readyState >= 2) {
-                try {
-                    const vw = activeVideoElement.videoWidth;
-                    const vh = activeVideoElement.videoHeight;
-                    const sx = ((f.faceX ?? f.x) / cvCanvas.width) * vw;
-                    const sy = ((f.faceY ?? f.y) / cvCanvas.height) * vh;
-                    const sw = ((f.faceW ?? f.w) / cvCanvas.width) * vw;
-                    const sh = ((f.faceH ?? f.h) / cvCanvas.height) * vh;
-                    cvCtx.drawImage(activeVideoElement, sx, sy, sw, sh, tx, ty, thumb, thumb);
-                } catch (e) { /* skip */ }
             }
             cvCtx.fillStyle = f.color;
             const labelW = Math.max(130, f.w + 2);
@@ -2969,6 +3072,9 @@
             activeVideoElement = document.getElementById('cvMainVideo');
             mainVideoReady = false;
             activeDetectedFaces = [];
+            displayDetectedFaces = [];
+            lastRealFaceAt = 0;
+            lastFaceSidebarSig = '';
             applyVideoSources(activeVideoElement, activeCamera);
             updatePipActiveState();
             updateFaceSidebar();
@@ -3163,14 +3269,15 @@
                 cvCtx.stroke();
             }
             
-            if (useRealFaceDetection && faceModelsReady && !faceDetectBusy && cvFrameCounter % 5 === 0) {
+            if (useRealFaceDetection && faceModelsReady && !faceDetectBusy && cvFrameCounter % FACE_DETECT_INTERVAL === 0) {
                 detectFacesOnActiveVideo();
             }
+            syncDisplayDetectedFaces();
             if (cvFrameCounter % 22 === 0) {
                 refreshStaffAttireForSimulatedShoppers();
             }
 
-            const hasRealFaces = activeDetectedFaces.length > 0;
+            const hasRealFaces = displayDetectedFaces.length > 0;
 
             if (!hasRealFaces) {
                 updateShopperDetections();
@@ -3186,7 +3293,7 @@
             }
             
             if (hasRealFaces) {
-                activeDetectedFaces.forEach(f => drawDetectedFaceBox(f));
+                displayDetectedFaces.forEach(f => drawDetectedFaceBox(f));
             } else if (activeCamera === 'CAM1') {
                 // Entry Threshold Boundary
                 cvCtx.strokeStyle = 'rgba(255, 59, 48, 0.5)';
@@ -4076,13 +4183,18 @@
             const bodyContent = document.getElementById('modal-body-content');
             
             modal.classList.add('show');
-            
+            const modalContent = modal.querySelector('.modal-content');
+            if (modalContent) {
+                modalContent.classList.toggle('modal-content--ledger', kpiType === 'visitors');
+            }
+
             if (kpiType === 'visitors') {
                 titleText.innerHTML = `<i data-lucide="users" style="color: var(--primary); width: 20px; height: 20px;"></i> Live Edge AI Visitor Ledger`;
                 bodyContent.innerHTML = `
                     <div style="margin-bottom: 1rem;">
                         <strong>Centralized Store Roster</strong>: YOLOv8 feeds detect human coordinates, correlate tracking vectors, and classify staff vs customers dynamically.
                     </div>
+                    <div class="ledger-scroll-wrap">
                     <table class="ledger-table">
                         <thead>
                             <tr>
@@ -4134,6 +4246,7 @@
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                     <div style="margin-top: 1.5rem;">
                         <strong>Neural Attire Embedding Signature (Re-ID Vector Footprint)</strong>:
                         <div class="vector-grid-box">
@@ -4592,7 +4705,12 @@
         }
 
         function closeModal() {
-            document.getElementById('module-modal').classList.remove('show');
+            const modal = document.getElementById('module-modal');
+            if (modal) {
+                modal.classList.remove('show');
+                const modalContent = modal.querySelector('.modal-content');
+                if (modalContent) modalContent.classList.remove('modal-content--ledger');
+            }
         }
 
         function dispatchCashier(registerNum) {
